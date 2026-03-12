@@ -1,4 +1,4 @@
-简体中文说明
+[简体中文说明](https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping/blob/main/README-CN.md)
 # obsidian-auto-download-imgs-after-web-clipping
 After you save a webpage using the [web clipper](https://chromewebstore.google.com/detail/obsidian-web-clipper/cnjifjpddelmedmihgijeibhnjfabmlf) plugin in Obsidian, the images on the webpage will not be stored locally but will instead still reference the online image URLs.
 
