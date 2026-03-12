@@ -31,3 +31,6 @@ You can download the compressed file from Releases, extract it to the `.obsidian
 ## Method 2
 
 Use the BRAT plugin, click the BRAT button in the sidebar, click Add Plugin, and enter: [https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping](https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping)
+
+# License
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
