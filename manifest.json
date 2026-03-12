@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "minAppVersion": "1.8.3",
   "description": "Automatically download remote images to local vault after web clipping.",
-  "author": "You",
+  "author": "github.com/chenxiccc",
   "isDesktopOnly": true
 }
