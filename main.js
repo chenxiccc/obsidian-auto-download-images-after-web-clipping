@@ -138,6 +138,23 @@ const HTML_IMG_REGEX = /<img\s[^>]*\bsrc=(?:"(https?:\/\/[^"]+)"|'(https?:\/\/[^
 // 最小文件大小：小于此值视为追踪像素，直接跳过（1 KB）
 const MIN_IMAGE_BYTES = 1024;
 
+// 下载失败后的重试间隔毫秒数 | Retry interval in milliseconds for failed downloads
+const RETRY_DELAY_MS = 1500;
+
+// 同时下载图片的最大并发数 | Maximum number of concurrent image downloads
+const DOWNLOAD_CONCURRENCY = 3;
+
+// MIME 类型到文件扩展名的映射表 | Map from MIME type to file extension
+const MIME_EXT_MAP = {
+  'image/jpeg':    '.jpg',
+  'image/png':     '.png',
+  'image/gif':     '.gif',
+  'image/webp':    '.webp',
+  'image/svg+xml': '.svg',
+  'image/avif':    '.avif',
+  'image/bmp':     '.bmp',
+};
+
 // ─── 设置页 ────────────────────────────────────────────────────────────────
 
 class AutoDownloadSettingTab extends PluginSettingTab {
@@ -267,9 +284,7 @@ class AutoDownloadSettingTab extends PluginSettingTab {
 class AutoDownloadAttachmentsPlugin extends Plugin {
 
   get t() {
-    const { language } = this.settings;
-    const lang = language === 'auto' ? detectObsidianLang() : language;
-    return TRANSLATIONS[lang] ?? TRANSLATIONS.en;
+    return TRANSLATIONS[this._resolvedLang] ?? TRANSLATIONS.en;
   }
 
   async onload() {
@@ -300,7 +315,7 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
       })
     );
 
-    const folders = parseFolders(this.settings.watchFolders).join(', ');
+    const folders = this._watchedFolders.join(', ');
     console.log(this.t.consoleLoaded(folders));
   }
 
@@ -310,7 +325,7 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
   }
 
   isWatched(filePath) {
-    return parseFolders(this.settings.watchFolders).some(folder => {
+    return this._watchedFolders.some(folder => {
       const prefix = folder.endsWith('/') ? folder : folder + '/';
       return filePath.startsWith(prefix);
     });
@@ -380,14 +395,22 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
         .replace(/\s+/g, '-')
         .replace(/[\\/:*?"<>|]/g, '_');
 
-      // ── 4. 下载每个唯一 URL（去重：同一 URL 只下载一次）───────────────
+      // ── 4. 并行下载所有唯一 URL（最多 DOWNLOAD_CONCURRENCY 个同时进行）──
       const urlToLocal = new Map(); // url → destPath
       const failedUrls  = [];
-      let downloadIndex = 1;
+      let savedCount = 1;
 
-      for (const url of uniqueUrls) {
-        const { buffer, ext } = await this.fetchWithRetry(url, 3);
+      // 并行获取所有图片内容 | Fetch all images in parallel with concurrency limit
+      const downloadResults = await runWithConcurrency(
+        uniqueUrls.map(url => async () => {
+          const result = await this.fetchWithRetry(url, 3);
+          return { url, ...result };
+        }),
+        DOWNLOAD_CONCURRENCY
+      );
 
+      // 顺序保存到磁盘，避免命名冲突 | Save to disk sequentially to avoid naming conflicts
+      for (const { url, buffer, ext } of downloadResults) {
         if (!buffer) {
           this.failedUrls.add(url);
           failedUrls.push(url);
@@ -395,7 +418,7 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
           continue;
         }
 
-        const rawName = `${titleBase}-${downloadIndex}${ext}`
+        const rawName = `${titleBase}-${savedCount}${ext}`
           .replace(/\s+/g, '-')
           .replace(/[\\:*?"<>|]/g, '_');
         const destPath = await this.resolveDestPath(attachmentFolder, rawName);
@@ -403,7 +426,7 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
         try {
           await this.app.vault.adapter.writeBinary(destPath, buffer);
           urlToLocal.set(url, destPath);
-          downloadIndex++;
+          savedCount++;
         } catch (err) {
           this.failedUrls.add(url);
           failedUrls.push(url);
@@ -466,7 +489,6 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
 
   async fetchWithRetry(url, maxRetries = 3) {
     const t = this.t;
-    const RETRY_DELAY_MS = 1500;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -523,21 +545,9 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
     return { buffer: null, ext: '.jpg' };
   }
 
-  // 根据 Content-Type 响应头推断扩展名
+  // 根据 Content-Type 响应头推断扩展名 | Infer file extension from Content-Type header
   extFromContentType(contentType) {
-    const map = {
-      'image/jpeg':    '.jpg',
-      'image/png':     '.png',
-      'image/gif':     '.gif',
-      'image/webp':    '.webp',
-      'image/svg+xml': '.svg',
-      'image/avif':    '.avif',
-      'image/bmp':     '.bmp',
-    };
-    for (const [mime, ext] of Object.entries(map)) {
-      if (contentType.includes(mime)) return ext;
-    }
-    return null;
+    return MIME_EXT_MAP[contentType.split(';')[0].trim()] ?? null;
   }
 
   // 解析目标路径，若同名文件已存在则追加 (2)、(3)… 后缀
@@ -555,9 +565,13 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
     return normalizePath(`${folder}/${stem}(${Date.now()})${ext}`);
   }
 
-  // 确保目录存在：逐级创建，容忍并发竞态（另一个任务抢先创建也不报错）
+  // 确保目录存在：先整体检查，再逐级创建，容忍并发竞态
+  // Ensure folder exists: quick full-path check first, then create segment by segment, tolerating race conditions
   async ensureFolder(folderPath) {
     if (!folderPath || folderPath === '/') return;
+    // 绝大多数情况下文件夹已存在，一次检查即可返回 | Fast path: folder already exists in the common case
+    if (await this.app.vault.adapter.exists(folderPath)) return;
+
     const parts = folderPath.split('/').filter(p => p);
     let current = '';
     for (const part of parts) {
@@ -567,6 +581,7 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
           await this.app.vault.createFolder(current);
         } catch (err) {
           // 若并发任务已先创建，exists 此时应为 true，否则真正报错
+          // If a concurrent task already created it, exists should now be true; otherwise re-throw
           if (!await this.app.vault.adapter.exists(current)) throw err;
         }
       }
@@ -582,10 +597,16 @@ class AutoDownloadAttachmentsPlugin extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // 缓存解析结果，避免每次事件都重新计算 | Cache derived values to avoid recomputation on every event
+    this._resolvedLang    = this.settings.language === 'auto' ? detectObsidianLang() : this.settings.language;
+    this._watchedFolders  = parseFolders(this.settings.watchFolders);
   }
 
   async saveSettings() {
     await this.saveData(this.settings);
+    // 设置变更后同步刷新缓存 | Refresh caches after settings change
+    this._resolvedLang    = this.settings.language === 'auto' ? detectObsidianLang() : this.settings.language;
+    this._watchedFolders  = parseFolders(this.settings.watchFolders);
   }
 }
 
@@ -616,6 +637,25 @@ function sanitizeFolderName(name) {
     .replace(/\s+/g, '-')
     .replace(/^[.\s]+|[.\s]+$/g, '')
     || 'attachments';
+}
+
+/**
+ * 以有限并发度运行异步任务列表，返回与入参顺序一致的结果数组
+ * Run async tasks with a concurrency limit; returns results in the same order as input
+ */
+async function runWithConcurrency(tasks, limit) {
+  const results = new Array(tasks.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < tasks.length) {
+      const i = nextIndex++;
+      results[i] = await tasks[i]();
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, tasks.length) }, worker)
+  );
+  return results;
 }
 
 module.exports = AutoDownloadAttachmentsPlugin;
