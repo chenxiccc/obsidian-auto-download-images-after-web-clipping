@@ -1,0 +1,53 @@
+# 每次推送到 main 分支时，自动打包并发布 GitHub Release
+# Automatically package and publish a GitHub Release on every push to main
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 检出代码 | Checkout repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 从 manifest.json 读取版本号和插件 ID | Read version and plugin ID from manifest.json
+      - name: Read manifest metadata
+        id: meta
+        run: |
+          VERSION=$(jq -r '.version' manifest.json)
+          PLUGIN_ID=$(jq -r '.id' manifest.json)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "zip=${PLUGIN_ID}-${VERSION}.zip" >> $GITHUB_OUTPUT
+
+      # 打包 main.js 和 manifest.json 为 zip | Bundle main.js and manifest.json into a zip
+      - name: Build zip
+        run: zip "${{ steps.meta.outputs.zip }}" main.js manifest.json
+
+      # 若同名 Release/Tag 已存在则先删除，确保内容始终是最新的
+      # Delete existing release and tag if present, so the latest content always wins
+      - name: Delete existing release if present
+        run: gh release delete "${{ steps.meta.outputs.version }}" --yes --cleanup-tag || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 创建 Release 并上传资源文件 | Create release and upload assets
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.version }}
+          name: ${{ steps.meta.outputs.version }}
+          generate_release_notes: true
+          files: |
+            main.js
+            manifest.json
+            ${{ steps.meta.outputs.zip }}
