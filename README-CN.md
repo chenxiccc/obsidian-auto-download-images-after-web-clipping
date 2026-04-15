@@ -16,4 +16,4 @@
 ## 方法1：
 你可以下载Release文件的压缩包，解压到obsidian的.obsidian/plugins目录下，之后在obsidian里刷新插件列表，启用。
 ## 方法2
-使用BRAT插件，点击侧边栏的BRAT按钮，点击添加插件，输入https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping 
+使用BRAT插件，点击侧边栏的BRAT按钮，点击添加插件，输入https://github.com/chenxiccc/obsidian-auto-download-images-after-web-clipping 

@@ -1,5 +1,5 @@
-[中文说明](https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping/blob/main/README-CN.md)
-# obsidian-auto-download-imgs-after-web-clipping
+[中文说明](https://github.com/chenxiccc/obsidian-auto-download-images-after-web-clipping/blob/main/README-CN.md)
+# Auto Download Images After Web Clipping
 When you use the [web clipper](https://chromewebstore.google.com/detail/obsidian-web-clipper/cnjifjpddelmedmihgijeibhnjfabmlf) plugin in Obsidian to save a webpage, the images on the webpage will not be saved locally and will still reference the online image URL addresses.  
 I want the images to be saved locally.  
 There are several solutions. For example, you can assign a shortcut key to `editor:download-attachments` to manually download the images to your local device.  
@@ -30,7 +30,7 @@ You can download the compressed file from Releases, extract it to the `.obsidian
 
 ## Method 2
 
-Use the BRAT plugin, click the BRAT button in the sidebar, click Add Plugin, and enter: [https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping](https://github.com/chenxiccc/obsidian-auto-download-imgs-after-web-clipping)
+Use the BRAT plugin, click the BRAT button in the sidebar, click Add Plugin, and enter: [https://github.com/chenxiccc/obsidian-auto-download-images-after-web-clipping](https://github.com/chenxiccc/obsidian-auto-download-images-after-web-clipping)
 
 # License
 This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.

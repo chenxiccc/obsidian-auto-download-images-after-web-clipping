@@ -20,6 +20,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 安装 Node.js | Set up Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # 安装依赖并编译 TypeScript | Install dependencies and compile TypeScript
+      - name: Install dependencies and build
+        run: npm ci && npm run build
+
       # 从 manifest.json 读取版本号和插件 ID | Read version and plugin ID from manifest.json
       - name: Read manifest metadata
         id: meta
