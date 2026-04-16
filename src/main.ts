@@ -63,7 +63,6 @@ function parseFolders(raw: string): string[] {
 function sanitizeFolderName(name: string): string {
   return name
     .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/[\u0000-\u001f]/g, '')
     .replace(/\s+/g, '-')
     .replace(/^[.\s]+|[.\s]+$/g, '')
     || 'attachments';
