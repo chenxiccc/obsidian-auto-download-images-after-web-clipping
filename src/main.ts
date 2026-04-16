@@ -63,7 +63,7 @@ function parseFolders(raw: string): string[] {
 function sanitizeFolderName(name: string): string {
   return name
     .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/[\x00-\x1f]/g, '')
+    .replace(/[\u0000-\u001f]/g, '')
     .replace(/\s+/g, '-')
     .replace(/^[.\s]+|[.\s]+$/g, '')
     || 'attachments';
@@ -111,7 +111,6 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
   _watchedFolders: string[];
 
   get t(): TranslationMap {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return TRANSLATIONS[this._resolvedLang] ?? TRANSLATIONS['en']!;
   }
 
@@ -136,14 +135,14 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         }
         const timer = setTimeout(() => {
           this.debounceTimers.delete(file.path);
-          this.downloadImagesInFile(file);
+          void this.downloadImagesInFile(file);
         }, this.settings.delayMs);
         this.debounceTimers.set(file.path, timer);
       })
     );
 
     const folders = this._watchedFolders.join(', ');
-    console.log(this.t.consoleLoaded(folders));
+    console.debug(this.t.consoleLoaded(folders));
   }
 
   onunload(): void {
@@ -158,14 +157,16 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     });
   }
 
-  async resolveAttachmentFolder(file: TFile): Promise<string> {
+  resolveAttachmentFolder(file: TFile): string {
     const { attachmentPathMode, customAttachmentFolder } = this.settings;
     const fileDir = file.parent?.path ?? '';
 
     switch (attachmentPathMode) {
       case 'obsidian': {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const setting = (this.app.vault as any).getConfig('attachmentFolderPath') as string ?? 'attachments';
+        // 通过扩展类型访问 Obsidian 内部 vault 配置，getConfig 是未公开但稳定的 API
+        // Access Obsidian's internal vault config via extended type; getConfig is an undocumented but stable API
+        const vaultWithConfig = this.app.vault as typeof this.app.vault & { getConfig(key: string): unknown };
+        const setting = (vaultWithConfig.getConfig('attachmentFolderPath') as string | undefined) ?? 'attachments';
         if (setting === '/') return normalizePath('/');
         if (setting.startsWith('./')) {
           return normalizePath(`${fileDir}/${setting.slice(2)}`);
@@ -218,7 +219,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       if (uniqueUrls.length === 0) return;
 
       // ── 3. 确保附件目录存在 / Ensure attachment folder exists ──────────
-      const attachmentFolder = await this.resolveAttachmentFolder(file);
+      const attachmentFolder = this.resolveAttachmentFolder(file);
       await this.ensureFolder(attachmentFolder);
 
       const titleBase = file.basename

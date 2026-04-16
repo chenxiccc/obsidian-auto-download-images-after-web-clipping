@@ -1,0 +1,18 @@
+/* 监听文件夹输入框：等宽字体，铺满宽度 */
+/* Watch folders textarea: monospace font, full width */
+.auto-dl-folder-input {
+  width: 100%;
+  font-family: var(--font-monospace);
+}
+
+/* 防抖延迟输入框：固定窄宽度 */
+/* Debounce delay input: fixed narrow width */
+.auto-dl-delay-input {
+  width: 80px;
+}
+
+/* 自定义子文件夹名称输入框：中等宽度 */
+/* Custom subfolder name input: medium width */
+.auto-dl-custom-folder-input {
+  width: 200px;
+}

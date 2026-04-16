@@ -93,7 +93,7 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     consoleGiveUp:              (attempt, url, msg) =>
                                   `[AutoDL] Attempt ${attempt} failed, giving up: ${url}\nReason: ${msg}`,
     consoleKeepOriginal:        (url) => `[AutoDL] Download failed, keeping original link: ${url}`,
-    consoleWriteFailed:         (path, err) => `[AutoDL] Write failed ${path}: ${err}`,
+    consoleWriteFailed:         (path, err) => `[AutoDL] Write failed ${path}: ${String(err)}`,
     consoleSkipNonImage:        (type, url) => `[AutoDL] Non-image response (${type || 'unknown'}), skipping: ${url}`,
     consoleSkipTooSmall:        (bytes, url) => `[AutoDL] File too small (${bytes}B), likely a tracking pixel, skipping: ${url}`,
     consoleLoaded:              (folders) => `Auto Download Images After Clipping: started, watching → ${folders}`,
@@ -143,7 +143,7 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     consoleGiveUp:              (attempt, url, msg) =>
                                   `[AutoDL] 第 ${attempt} 次尝试失败，放弃: ${url}\n原因: ${msg}`,
     consoleKeepOriginal:        (url) => `[AutoDL] 下载失败，保留原始链接: ${url}`,
-    consoleWriteFailed:         (path, err) => `[AutoDL] 写入文件失败 ${path}: ${err}`,
+    consoleWriteFailed:         (path, err) => `[AutoDL] 写入文件失败 ${path}: ${String(err)}`,
     consoleSkipNonImage:        (type, url) => `[AutoDL] 非图片响应（${type || '未知类型'}），跳过: ${url}`,
     consoleSkipTooSmall:        (bytes, url) => `[AutoDL] 文件过小（${bytes}B），疑似追踪像素，跳过: ${url}`,
     consoleLoaded:              (folders) => `剪藏后自动下载图片：已启动，监听文件夹 → ${folders}`,
@@ -195,7 +195,6 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
   get t(): TranslationMap {
     const { language } = this.plugin.settings;
     const lang = language === 'auto' ? detectObsidianLang() : language;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return TRANSLATIONS[lang] ?? TRANSLATIONS['en']!;
   }
 
@@ -203,7 +202,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const t = this.t;
     containerEl.empty();
-    containerEl.createEl('h2', { text: t.settingTitle });
+    new Setting(containerEl).setName(t.settingTitle).setHeading();
 
     // ── 语言 / Language ──────────────────────────────────────────────────
     new Setting(containerEl)
@@ -235,8 +234,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           });
         text.inputEl.rows = 6;
-        text.inputEl.style.width = '100%';
-        text.inputEl.style.fontFamily = 'monospace';
+        text.inputEl.addClass('auto-dl-folder-input');
       });
 
     // ── 触发延迟 / Debounce delay ─────────────────────────────────────────
@@ -255,7 +253,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
             }
           });
         text.inputEl.type = 'number';
-        text.inputEl.style.width = '80px';
+        text.inputEl.addClass('auto-dl-delay-input');
       });
 
     // ── 图片保存位置 / Image save location ───────────────────────────────
@@ -288,7 +286,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
               this.plugin.settings.customAttachmentFolder = value.trim() || 'attachments';
               await this.plugin.saveSettings();
             });
-          text.inputEl.style.width = '200px';
+          text.inputEl.addClass('auto-dl-custom-folder-input');
         });
     }
 
