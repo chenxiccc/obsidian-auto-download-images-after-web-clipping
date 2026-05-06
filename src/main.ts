@@ -89,13 +89,13 @@ async function runWithConcurrency<T>(tasks: Array<() => Promise<T>>, limit: numb
 
 // 从 frontmatter 的 source 字段提取网页来源 URL 作为 Referer
 // Extract source page URL from frontmatter's 'source' field to use as Referer
-function extractRefererFromFrontmatter(frontmatter: Record<string, unknown> | undefined | null): string | null {
-  if (!frontmatter) return null;
+function extractRefererFromFrontmatter(frontmatter: Record<string, unknown> | undefined | null): string | undefined {
+  if (!frontmatter) return undefined;
   const value = frontmatter['source'];
   if (typeof value === 'string' && /^https?:\/\//.test(value)) {
     return value.trim();
   }
-  return null;
+  return undefined;
 }
 
 // ─── 主插件 / Main plugin ──────────────────────────────────────────────────
@@ -256,7 +256,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       // 并行获取所有图片内容 | Fetch all images in parallel with concurrency limit
       const downloadResults = await runWithConcurrency(
         uniqueUrls.map(url => async () => {
-          const result = await this.fetchWithRetry(url, 3, pageReferer ?? undefined);
+          const result = await this.fetchWithRetry(url, 3, pageReferer);
           return { url, ...result };
         }),
         DOWNLOAD_CONCURRENCY
@@ -347,8 +347,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     const t = this.t;
     const imageOrigin = new URL(url).origin;
 
-    // 当页面 Referer 与图片 origin 不同时，先用页面 Referer 尝试，失败再用图片 origin 回退
-    // When page Referer differs from image origin, try page Referer first, then fall back to image origin
+    // 不同源时双 Referer 策略：先页面 Referer（应对防盗链），失败回退图片 origin
+    // Dual-Referer strategy for cross-origin: try page Referer first (bypass hotlink protection), then image origin
     const referersToTry: string[] = pageReferer && pageReferer !== imageOrigin
       ? [pageReferer, imageOrigin]
       : [pageReferer ?? imageOrigin];
@@ -356,48 +356,40 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     for (const referer of referersToTry) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          // 使用 requestUrl（Node.js 层发起，绕过 CORS / 防盗链限制）
-          // Use requestUrl (Node.js level, bypasses CORS / hotlink protection)
           const resp = await requestUrl({
             url,
             headers: {
               'Referer':    referer,
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             },
-            throw: false, // 不自动抛出，手动判断状态码 | Don't throw automatically, check status code manually
+            throw: false,
           });
 
           if (resp.status >= 400 && resp.status < 500) {
-            // 4xx：当前 Referer 被拒绝，切换到下一个 Referer 重试
-            // 4xx: current Referer rejected, switch to next Referer and retry
             console.warn(t.console4xx(resp.status, url));
-            break; // 跳出 attempt 循环，尝试下一个 referer | Break attempt loop, try next referer
+            // 仅 403 可能与 Referer 相关，切换 referer 重试；其余 4xx 换 referer 无意义
+            // Only 403 may be Referer-related; other 4xx won't change with a different Referer
+            if (resp.status !== 403) return { buffer: null, ext: '.jpg' };
+            break;
           }
 
           if (resp.status >= 300) {
             throw new Error(`HTTP ${resp.status}`);
           }
 
-          // ── 验证 Content-Type：仅接受图片类型
-          //    Validate Content-Type: only accept image types
           const contentType = resp.headers['content-type'] ?? '';
           const isImage  = contentType.startsWith('image/');
           const isBinary = contentType.includes('application/octet-stream') || contentType === '';
           if (!isImage && !isBinary) {
-            // 服务器明确返回了非图片类型（如 text/html 错误页），切换 Referer 重试
-            // Server returned a non-image type (e.g. text/html error page), switch Referer and retry
             console.warn(t.consoleSkipNonImage(contentType, url));
-            break; // 跳出 attempt 循环，尝试下一个 referer | Break attempt loop, try next referer
+            break;
           }
 
-          // ── 过滤追踪像素（< 1 KB）/ Filter tracking pixels (< 1 KB) ─────
           if (resp.arrayBuffer.byteLength < MIN_IMAGE_BYTES) {
             console.warn(t.consoleSkipTooSmall(resp.arrayBuffer.byteLength, url));
             return { buffer: null, ext: '.jpg' };
           }
 
-          // 优先用 Content-Type 推断扩展名，回退到 URL 推断
-          // Prefer Content-Type for extension inference, fall back to URL
           const ext = this.extFromContentType(contentType) ?? this.extractExt(url);
           return { buffer: resp.arrayBuffer, ext };
 
@@ -406,7 +398,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           const msg = err instanceof Error ? err.message : String(err);
           if (isLastAttempt) {
             console.warn(t.consoleGiveUp(attempt, url, msg));
-            break; // 跳出 attempt 循环，尝试下一个 referer | Break attempt loop, try next referer
+            break;
           }
           console.warn(t.consoleRetry(attempt, RETRY_DELAY_MS, url, msg));
           await sleep(RETRY_DELAY_MS);
