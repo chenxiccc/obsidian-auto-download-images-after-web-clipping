@@ -45,7 +45,9 @@ export interface TranslationMap {
   consoleWriteFailed:      (path: string, err: unknown) => string;
   consoleSkipNonImage:     (type: string, url: string) => string;
   consoleSkipTooSmall:     (bytes: number, url: string) => string;
-  consoleLoaded:           (folders: string) => string;
+  consoleRefererResolved:  (referer: string) => string;
+  consoleRefererFallback:   string;
+  consoleLoaded:            (folders: string) => string;
 }
 
 export const TRANSLATIONS: Record<string, TranslationMap> = {
@@ -96,6 +98,8 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     consoleWriteFailed:         (path, err) => `[AutoDL] Write failed ${path}: ${String(err)}`,
     consoleSkipNonImage:        (type, url) => `[AutoDL] Non-image response (${type || 'unknown'}), skipping: ${url}`,
     consoleSkipTooSmall:        (bytes, url) => `[AutoDL] File too small (${bytes}B), likely a tracking pixel, skipping: ${url}`,
+    consoleRefererResolved:       (referer) => `[AutoDL] Referer resolved from page source: ${referer}`,
+    consoleRefererFallback:       '[AutoDL] No page referer found, falling back to image origin',
     consoleLoaded:              (folders) => `Auto Download Images After Clipping: started, watching → ${folders}`,
   },
 
@@ -146,6 +150,8 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     consoleWriteFailed:         (path, err) => `[AutoDL] 写入文件失败 ${path}: ${String(err)}`,
     consoleSkipNonImage:        (type, url) => `[AutoDL] 非图片响应（${type || '未知类型'}），跳过: ${url}`,
     consoleSkipTooSmall:        (bytes, url) => `[AutoDL] 文件过小（${bytes}B），疑似追踪像素，跳过: ${url}`,
+    consoleRefererResolved:       (referer) => `[AutoDL] 已从页面来源提取 Referer: ${referer}`,
+    consoleRefererFallback:       '[AutoDL] 未找到页面 Referer，回退使用图片自身 origin',
     consoleLoaded:              (folders) => `剪藏后自动下载图片：已启动，监听文件夹 → ${folders}`,
   },
 };
