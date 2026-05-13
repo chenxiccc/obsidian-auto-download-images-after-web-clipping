@@ -1,7 +1,7 @@
 {
   "id": "auto-download-images-after-web-clipping",
   "name": "Auto Download Images After Web Clipping",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "minAppVersion": "1.8.7",
   "description": "Automatically download remote images to local vault after web clipping.",
   "author": "github.com/chenxiccc",
