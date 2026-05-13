@@ -1,5 +1,5 @@
-# 每次推送到 main 分支时，自动打包并发布 GitHub Release
-# Automatically package and publish a GitHub Release on every push to main
+# 仅当 manifest.json 变更推送到 main 时发布 Release（即版本号变化时）
+# Only publish a GitHub Release when manifest.json changes are pushed to main (i.e., version bumps)
 
 name: Release
 
@@ -7,6 +7,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'manifest.json'
 
 permissions:
   contents: write

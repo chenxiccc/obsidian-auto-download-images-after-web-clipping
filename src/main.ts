@@ -50,7 +50,7 @@ function formatImageLink(destPath: string, alt: string, linkFormat: string): str
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(r => activeWindow.setTimeout(r, ms));
+  return new Promise(r => window.setTimeout(r, ms));
 }
 
 function parseFolders(raw: string): string[] {
@@ -112,7 +112,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
   private failedUrls: Set<string>;
 
   // 每个文件的防抖计时器 | Debounce timers per file
-  private debounceTimers: Map<string, ReturnType<typeof activeWindow.setTimeout>>;
+  private debounceTimers: Map<string, number>;
 
   // 缓存的已解析语言 | Cached resolved language
   _resolvedLang: string;
@@ -141,9 +141,9 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         // 防抖：每次修改都重置计时器，静止 delayMs 后才真正触发
         // Debounce: reset timer on every modification, trigger only after delayMs of inactivity
         if (this.debounceTimers.has(file.path)) {
-          activeWindow.clearTimeout(this.debounceTimers.get(file.path));
+          window.clearTimeout(this.debounceTimers.get(file.path));
         }
-        const timer = activeWindow.setTimeout(() => {
+        const timer = window.setTimeout(() => {
           this.debounceTimers.delete(file.path);
           void this.downloadImagesInFile(file);
         }, this.settings.delayMs);
@@ -156,7 +156,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
   }
 
   onunload(): void {
-    for (const timer of this.debounceTimers.values()) activeWindow.clearTimeout(timer);
+    for (const timer of this.debounceTimers.values()) window.clearTimeout(timer);
     this.debounceTimers.clear();
   }
 
