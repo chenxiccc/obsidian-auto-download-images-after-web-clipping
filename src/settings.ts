@@ -157,8 +157,8 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
 };
 
 export function detectObsidianLang(): string {
-  const lang = window.localStorage.getItem('language') ?? '';
-  return lang === 'zh' ? 'zh' : 'en';
+  const lang = getLanguage();
+  return lang.startsWith('zh') ? 'zh' : 'en';
 }
 
 // ─── 设置接口 / Settings interface ────────────────────────────────────────
@@ -187,7 +187,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
 
 // ─── 设置页 / Settings tab ─────────────────────────────────────────────────
 
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, PluginSettingTab, Setting, getLanguage } from 'obsidian';
 import type AutoDownloadAttachmentsPlugin from './main';
 
 export class AutoDownloadSettingTab extends PluginSettingTab {
