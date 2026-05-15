@@ -27,3 +27,6 @@ CLAUDE.md
 
 # playwright
 .playwright-cli
+
+# eslint
+.eslintcache
