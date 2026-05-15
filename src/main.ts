@@ -1,4 +1,4 @@
-/* global Buffer */
+/* global Buffer -- Node.js global available in Electron renderer */
 
 import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
 import {
@@ -608,9 +608,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     this._resolvedLang   = this.settings.language === 'auto' ? detectObsidianLang() : this.settings.language;
     this._watchedFolders = parseFolders(this.settings.watchFolders);
     this._useMarkdownLinks = await this.resolveUseMarkdownLinks();
-    // navigator.userAgent is intentionally used here to get the real browser UA for HTTP headers
-    // eslint-disable-next-line obsidianmd/platform
-    this._userAgent = navigator.userAgent;
+    const { userAgent } = window.navigator;
+    this._userAgent = userAgent;
   }
 
   async saveSettings(): Promise<void> {
