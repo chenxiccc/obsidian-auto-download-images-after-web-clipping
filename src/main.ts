@@ -1,4 +1,4 @@
-import { Notice, Plugin, TFile, normalizePath, requestUrl } from 'obsidian';
+import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
 import {
   AutoDownloadSettings,
   AutoDownloadSettingTab,
@@ -172,7 +172,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     // Cache https module (only available in Electron desktop)
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      this._httpsModule = (window as any).require('https') as any;
+      this._httpsModule = (window as any).require('https');
     } catch {
       this._httpsModule = null;
     }
@@ -376,41 +376,16 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
   // ── 下载方法 / Download methods ──────────────────────────────────────────
 
   async downloadImage(url: string, pageReferer?: string): Promise<{ buffer: ArrayBuffer | null; ext: string }> {
-    const result = await this.downloadWithRequestUrl(url);
-    if (result.buffer) return result;
+    if (!this._httpsModule) return FAILED_DOWNLOAD;
 
-    if (pageReferer && this._httpsModule) {
-      return this.downloadWithNodeHttps(url, pageReferer, 3);
-    }
-
-    return FAILED_DOWNLOAD;
-  }
-
-  private async downloadWithRequestUrl(url: string): Promise<{ buffer: ArrayBuffer | null; ext: string }> {
-    try {
-      const resp = await requestUrl({ url, throw: false });
-
-      if (resp.status >= 400) return FAILED_DOWNLOAD;
-
-      const contentType = resp.headers['content-type'] ?? '';
-      return this.validateResponse(resp.arrayBuffer, contentType, url);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[AutoDL] requestUrl 请求失败 / request failed: ${url} — ${msg}`);
-      return FAILED_DOWNLOAD;
-    }
-  }
-
-  private downloadWithNodeHttps(url: string, pageReferer: string, maxRetries = 3): Promise<{ buffer: ArrayBuffer | null; ext: string }> {
     const t = this.t;
-    const https = this._httpsModule!;
     const imageOrigin = new URL(url).origin;
 
-    const referersToTry: string[] = pageReferer !== imageOrigin
+    const referersToTry: string[] = pageReferer && pageReferer !== imageOrigin
       ? [pageReferer, imageOrigin]
-      : [pageReferer];
+      : [pageReferer ?? imageOrigin];
 
-    return this._tryReferers(https, url, referersToTry, maxRetries, t);
+    return this._tryReferers(this._httpsModule, url, referersToTry, 3, t);
   }
 
   private async _tryReferers(
@@ -434,20 +409,18 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
 
           case '403':
             console.warn(t.console4xx(403, url));
-            break; // 换下一个 Referer | switch to next referer
+            break;
 
           case 'network-error':
           case 'too-many-redirects':
             if (attempt === maxRetries) {
               console.warn(t.consoleGiveUp(attempt, url, result.error!));
-              break; // 跳出重试循环，换下一个 Referer | break retry loop, try next referer
+              break;
             }
             console.warn(t.consoleRetry(attempt, RETRY_DELAY_MS, url, result.error!));
             await sleep(RETRY_DELAY_MS);
-            continue; // 继续当前 Referer 的下一次重试 | continue with next retry for same referer
+            continue;
         }
-        // 403 break 或 network-error(最后一次) break 到这里 → 跳出内层重试循环
-        // 403 break or network-error(last attempt) break → exit inner retry loop
         break;
       }
     }
@@ -507,8 +480,6 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
 
           res.on('end', () => {
             const buffer = Buffer.concat(chunks);
-            // Node.js Buffer → ArrayBuffer，与 requestUrl 返回类型统一
-            // Node.js Buffer → ArrayBuffer, aligned with requestUrl return type
             const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
             resolve({ type: 'success', buffer: arrayBuffer, contentType });
           });
