@@ -24,10 +24,19 @@ Install from Obsidian Community Plugins: [Auto Download Images After Web Clippin
 
 **Folder Monitoring** — By default, monitors the `Clippings` folder. You can add more folders.
 
-**Image Save Path** — Three modes:
+**Image Save Path** — Four modes:
 - Follow Obsidian's attachment settings (default)
 - Create a subfolder named after the file
 - Custom subfolder relative to the file's directory
+- Custom path template (from vault root) — supports `{date:FORMAT}` and `{notename}` tokens, e.g. `_global/assets/{date:YYYY-MM}`
+
+**Image Filename Template** — Customize the downloaded image filename with tokens:
+- `{notename}` — the note's basename
+- `{index:NNN}` — zero-padded index; the number of digits is the padding width and the numeric value is the start, e.g. `{index:000}` → 000,001,002… (start from 0) or `{index:001}` → 001,002,003… (start from 1)
+- `{date:FORMAT}` — download date, e.g. `{date:YYYY-MM-DD}`
+- The file extension is added automatically from the downloaded image's type
+
+Default: `{notename}-img-{index:000}` → e.g. `My Note-img-000.webp`
 
 ---
 
@@ -51,7 +60,16 @@ Install from Obsidian Community Plugins: [Auto Download Images After Web Clippin
 
 **文件夹监听** — 默认监听 `Clippings` 文件夹，可添加更多。
 
-**图片保存路径** — 三种模式：
+**图片保存路径** — 四种模式：
 - 跟随 Obsidian 附件设置（默认）
 - 创建与文件同名的子文件夹
 - 文件所在目录下的自定义子文件夹
+- 自定义路径模板（从 vault 根目录开始）—— 支持 `{date:格式}` 和 `{notename}` 占位符，例如 `_global/assets/{date:YYYY-MM}`
+
+**图片文件名模板** — 用占位符自定义下载后的图片文件名：
+- `{notename}` —— 笔记名（不含扩展名）
+- `{index:NNN}` —— 补零序号；位数即补零宽度，数值即起始值。例如 `{index:000}` → 000,001,002…（从 0 开始）；`{index:001}` → 001,002,003…（从 1 开始）
+- `{date:格式}` —— 下载日期，例如 `{date:YYYY-MM-DD}`
+- 文件扩展名根据下载图片的实际类型自动追加
+
+默认：`{notename}-img-{index:000}` → 例如 `我的笔记-img-000.webp`

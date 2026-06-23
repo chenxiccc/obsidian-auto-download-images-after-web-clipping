@@ -17,14 +17,21 @@ export interface TranslationMap {
   delaySettingName:        string;
   delaySettingDesc:        string;
 
-  pathModeSettingName:     string;
-  pathModeSettingDesc:     string;
-  pathModeObsidian:        string;
-  pathModeCustom:          string;
-  pathModeSameName:        string;
-  customFolderSettingName: string;
-  customFolderSettingDesc: string;
-  customFolderPlaceholder: string;
+  pathModeSettingName:           string;
+  pathModeSettingDesc:           string;
+  pathModeObsidian:              string;
+  pathModeCustom:                string;
+  pathModeSameName:              string;
+  pathModeCustomTemplate:        string;
+  customFolderSettingName:       string;
+  customFolderSettingDesc:       string;
+  customFolderPlaceholder:       string;
+  customTemplateFolderSettingName:  string;
+  customTemplateFolderSettingDesc:  string;
+  customTemplateFolderPlaceholder:  string;
+  imageNameTemplateSettingName:    string;
+  imageNameTemplateSettingDesc:    string;
+  imageNameTemplatePlaceholder:    string;
 
   noticeSuccess:           (count: number, name: string) => string;
   noticePartial:           (ok: number, fail: number, name: string) => string;
@@ -63,14 +70,21 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     delaySettingName:           'Debounce delay (ms)',
     delaySettingDesc:           'Processing starts this long after the last file modification. Increase if images are missed because the clipper is still writing.',
 
-    pathModeSettingName:        'Image save location',
-    pathModeSettingDesc:        'Where to save downloaded images.',
-    pathModeObsidian:           'Follow Obsidian settings',
-    pathModeCustom:             'Custom subfolder under the same directory as the note',
-    pathModeSameName:           'Subfolder with the same name as the note (under the same directory)',
-    customFolderSettingName:    'Subfolder name',
-    customFolderSettingDesc:    'Folder name relative to the note\'s directory. Default: attachments',
-    customFolderPlaceholder:    'attachments',
+    pathModeSettingName:              'Image save location',
+    pathModeSettingDesc:              'Where to save downloaded images.',
+    pathModeObsidian:                 'Follow Obsidian settings',
+    pathModeCustom:                   'Custom subfolder under the same directory as the note',
+    pathModeSameName:                 'Subfolder with the same name as the note (under the same directory)',
+    pathModeCustomTemplate:           'Custom path template (from vault root)',
+    customFolderSettingName:          'Subfolder name',
+    customFolderSettingDesc:          'Folder name relative to the note\'s directory. Default: attachments',
+    customFolderPlaceholder:          'attachments',
+    customTemplateFolderSettingName:  'Path template',
+    customTemplateFolderSettingDesc:  'Path from the vault root. Tokens: {date:FORMAT} (e.g. {date:YYYY-MM}), {notename}. Use / or \\ as separators. Example: _global/assets/{date:YYYY-MM}',
+    customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
+    imageNameTemplateSettingName:     'Image filename template',
+    imageNameTemplateSettingDesc:     'Tokens: {notename}, {index:NNN} (NNN digits = padding width + start value, e.g. {index:000} → 000,001,…; {index:001} → 001,002,…), {date:FORMAT}. Extension is added automatically. Example: {notename}-img-{index:000}',
+    imageNameTemplatePlaceholder:     '{notename}-img-{index:000}',
 
     noticeSuccess:              (count, name) => `✅ Downloaded ${count} image(s) — ${name}`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}: ${ok} succeeded, ${fail} failed (original links kept)`,
@@ -110,14 +124,21 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     delaySettingName:           '防抖延迟（毫秒）',
     delaySettingDesc:           '文件最后一次修改后等待此时长再开始处理。如果图片经常漏下，说明剪藏器写入较慢，可适当调大。',
 
-    pathModeSettingName:        '图片保存位置',
-    pathModeSettingDesc:        '下载的图片保存到哪里。',
-    pathModeObsidian:           '跟随 Obsidian 设置',
-    pathModeCustom:             '笔记所在目录下的指定子文件夹',
-    pathModeSameName:           '笔记所在目录下与笔记同名的子文件夹',
-    customFolderSettingName:    '子文件夹名称',
-    customFolderSettingDesc:    '相对于笔记所在目录的子文件夹名称，默认为 attachments',
-    customFolderPlaceholder:    'attachments',
+    pathModeSettingName:              '图片保存位置',
+    pathModeSettingDesc:              '下载的图片保存到哪里。',
+    pathModeObsidian:                 '跟随 Obsidian 设置',
+    pathModeCustom:                   '笔记所在目录下的指定子文件夹',
+    pathModeSameName:                 '笔记所在目录下与笔记同名的子文件夹',
+    pathModeCustomTemplate:           '自定义路径模板（从 vault 根目录开始）',
+    customFolderSettingName:          '子文件夹名称',
+    customFolderSettingDesc:          '相对于笔记所在目录的子文件夹名称，默认为 attachments',
+    customFolderPlaceholder:          'attachments',
+    customTemplateFolderSettingName:  '路径模板',
+    customTemplateFolderSettingDesc:  '从 vault 根目录开始的路径。可用占位符：{date:格式}（如 {date:YYYY-MM}）、{notename}（笔记名）。用 / 或 \\ 作为分隔符。示例：_global/assets/{date:YYYY-MM}',
+    customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
+    imageNameTemplateSettingName:     '图片文件名模板',
+    imageNameTemplateSettingDesc:     '可用占位符：{notename}（笔记名）、{index:NNN}（NNN 位数=补零宽度与起始值，如 {index:000}→000,001…；{index:001}→001,002…）、{date:格式}。扩展名自动追加。示例：{notename}-img-{index:000}',
+    imageNameTemplatePlaceholder:     '{notename}-img-{index:000}',
 
     noticeSuccess:              (count, name) => `✅ 图片下载完成：${count} 张（${name}）`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}：${ok} 张成功，${fail} 张失败（已保留原始链接）`,
@@ -148,7 +169,7 @@ export function detectObsidianLang(): string {
 
 // ─── 设置接口 / Settings interface ────────────────────────────────────────
 
-export type AttachmentPathMode = 'obsidian' | 'custom' | 'samename';
+export type AttachmentPathMode = 'obsidian' | 'custom' | 'samename' | 'customTemplate';
 export type Language = 'auto' | 'en' | 'zh';
 
 export interface AutoDownloadSettings {
@@ -157,6 +178,8 @@ export interface AutoDownloadSettings {
   language:               Language;
   attachmentPathMode:     AttachmentPathMode;
   customAttachmentFolder: string;
+  customTemplateFolder:   string;
+  imageNameTemplate:      string;
 }
 
 export const DEFAULT_SETTINGS: AutoDownloadSettings = {
@@ -165,6 +188,8 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
   language:               'auto',
   attachmentPathMode:     'obsidian',
   customAttachmentFolder: 'attachments',
+  customTemplateFolder:   '_global/assets/{date:YYYY-MM}',
+  imageNameTemplate:      '{notename}-img-{index:000}',
 };
 
 // ─── 设置页 / Settings tab ─────────────────────────────────────────────────
@@ -250,9 +275,10 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
       .setDesc(t.pathModeSettingDesc)
       .addDropdown(drop => {
         drop
-          .addOption('obsidian', t.pathModeObsidian)
-          .addOption('custom',   t.pathModeCustom)
-          .addOption('samename', t.pathModeSameName)
+          .addOption('obsidian',        t.pathModeObsidian)
+          .addOption('custom',          t.pathModeCustom)
+          .addOption('samename',        t.pathModeSameName)
+          .addOption('customTemplate',  t.pathModeCustomTemplate)
           .setValue(this.plugin.settings.attachmentPathMode)
           .onChange(async (value) => {
             this.plugin.settings.attachmentPathMode = value as AttachmentPathMode;
@@ -277,5 +303,37 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           text.inputEl.addClass('auto-dl-custom-folder-input');
         });
     }
+
+    // ── 路径模板（仅 customTemplate 模式显示）/ Path template ──────────────
+    if (this.plugin.settings.attachmentPathMode === 'customTemplate') {
+      new Setting(containerEl)
+        .setName(t.customTemplateFolderSettingName)
+        .setDesc(t.customTemplateFolderSettingDesc)
+        .addText(text => {
+          text
+            .setPlaceholder(t.customTemplateFolderPlaceholder)
+            .setValue(this.plugin.settings.customTemplateFolder)
+            .onChange(async (value) => {
+              this.plugin.settings.customTemplateFolder = value.trim() || 'assets/{date:YYYY-MM}';
+              await this.plugin.saveSettings();
+            });
+          text.inputEl.addClass('auto-dl-template-folder-input');
+        });
+    }
+
+    // ── 图片文件名模板 / Image filename template ──────────────────────────
+    new Setting(containerEl)
+      .setName(t.imageNameTemplateSettingName)
+      .setDesc(t.imageNameTemplateSettingDesc)
+      .addText(text => {
+        text
+          .setPlaceholder(t.imageNameTemplatePlaceholder)
+          .setValue(this.plugin.settings.imageNameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.imageNameTemplate = value.trim() || '{notename}-{index:001}';
+            await this.plugin.saveSettings();
+          });
+        text.inputEl.addClass('auto-dl-image-name-input');
+      });
   }
 }
