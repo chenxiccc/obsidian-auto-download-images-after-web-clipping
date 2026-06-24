@@ -136,7 +136,7 @@ function sanitizeNoteName(basename: string, keepSpaces = false): string {
 }
 
 // 左侧补零 | Left-pad a number with zeros to the given width
-function zeroPad(num: number, width: number): string {
+export function zeroPad(num: number, width: number): string {
   let s = String(num);
   while (s.length < width) s = '0' + s;
   return s;
@@ -400,7 +400,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       const attachmentFolder = this.resolveAttachmentFolder(file);
       await this.ensureFolder(attachmentFolder);
 
-      const noteName = sanitizeNoteName(file.basename);
+      const noteName = sanitizeNoteName(file.basename, this.settings.keepOriginalNoteName);
 
       const urlToLocal = new Map<string, { destPath: string; tfile: TFile | null }>();
       const failedUrls: string[]  = [];

@@ -32,6 +32,8 @@ export interface TranslationMap {
   imageNameTemplateSettingName:    string;
   imageNameTemplateSettingDesc:    string;
   imageNameTemplatePlaceholder:    string;
+  previewLabel:                    (preview: string) => string;
+  previewNoteName:                 string;
 
   noticeSuccess:           (count: number, name: string) => string;
   noticePartial:           (ok: number, fail: number, name: string) => string;
@@ -83,8 +85,10 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     customTemplateFolderSettingDesc:  'Path from the vault root. Tokens: {date:FORMAT} (e.g. {date:YYYY-MM}), {notename}. Use / or \\ as separators. Example: _global/assets/{date:YYYY-MM}',
     customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
     imageNameTemplateSettingName:     'Image filename template',
-    imageNameTemplateSettingDesc:     'Tokens: {notename}, {index:NNN} (NNN digits = padding width + start value, e.g. {index:000} → 000,001,…; {index:001} → 001,002,…), {date:FORMAT}. Extension is added automatically. Example: {notename}-img-{index:000}',
-    imageNameTemplatePlaceholder:     '{notename}-img-{index:000}',
+    imageNameTemplateSettingDesc:     'Tokens: {notename}, {index:NNN} (NNN digits = padding width + start value, e.g. {index:000} → 000,001,…; {index:001} → 001,002,…), {date:FORMAT}. Extension is added automatically.',
+    imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    previewLabel:                     (preview) => `→ ${preview}`,
+    previewNoteName:                  'Note name',
 
     noticeSuccess:              (count, name) => `✅ Downloaded ${count} image(s) — ${name}`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}: ${ok} succeeded, ${fail} failed (original links kept)`,
@@ -137,8 +141,10 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     customTemplateFolderSettingDesc:  '从 vault 根目录开始的路径。可用占位符：{date:格式}（如 {date:YYYY-MM}）、{notename}（笔记名）。用 / 或 \\ 作为分隔符。示例：_global/assets/{date:YYYY-MM}',
     customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
     imageNameTemplateSettingName:     '图片文件名模板',
-    imageNameTemplateSettingDesc:     '可用占位符：{notename}（笔记名）、{index:NNN}（NNN 位数=补零宽度与起始值，如 {index:000}→000,001…；{index:001}→001,002…）、{date:格式}。扩展名自动追加。示例：{notename}-img-{index:000}',
-    imageNameTemplatePlaceholder:     '{notename}-img-{index:000}',
+    imageNameTemplateSettingDesc:     '可用占位符：{notename}（笔记名）、{index:NNN}（NNN 位数=补零宽度与起始值，如 {index:000}→000,001…；{index:001}→001,002…）、{date:格式}。扩展名自动追加。',
+    imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    previewLabel:                     (preview) => `→ ${preview}`,
+    previewNoteName:                  '笔记名',
 
     noticeSuccess:              (count, name) => `✅ 图片下载完成：${count} 张（${name}）`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}：${ok} 张成功，${fail} 张失败（已保留原始链接）`,
@@ -196,6 +202,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
 
 import { App, PluginSettingTab, Setting, getLanguage } from 'obsidian';
 import type AutoDownloadAttachmentsPlugin from './main';
+import { formatDateToken, formatNameTemplate } from './main';
 
 export class AutoDownloadSettingTab extends PluginSettingTab {
   plugin: AutoDownloadAttachmentsPlugin;
@@ -209,6 +216,53 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     const { language } = this.plugin.settings;
     const lang = language === 'auto' ? detectObsidianLang() : language;
     return TRANSLATIONS[lang] ?? TRANSLATIONS['en']!;
+  }
+
+  // 将模板渲染为预览字符串（{notename} 替换为占位词，其他 token 正常展开）
+  // Render a template to a preview string ({notename} → placeholder word, other tokens expanded normally)
+  private buildPreview(template: string, t: TranslationMap, mode: 'filename' | 'path'): string {
+    const placeholder = t.previewNoteName;
+    if (mode === 'path') {
+      // 路径模式：按段展开，保留 /，不整体过 sanitize
+      // Path mode: expand per-segment, preserve /, skip full sanitize
+      const segments = template.replace(/\\/g, '/').split('/').filter(s => s.length > 0);
+      const expanded = segments.map(seg => {
+        let out = seg.replace(/{notename}/g, '\x00');
+        out = formatNameTemplate(out, '\x00', 0);
+        return out.replace(/\x00/g, placeholder);
+      });
+      return expanded.join('/') + '/image.webp';
+    }
+    // 文件名模式：整体展开
+    // Filename mode: expand as a whole
+    const withPlaceholder = template.replace(/{notename}/g, '\x00');
+    const expanded = formatNameTemplate(withPlaceholder, '\x00', 0);
+    const preview = expanded.replace(/\x00/g, placeholder);
+    return `${preview}.webp`;
+  }
+
+  // 将预览行插入到 .setting-item-description 之后（或直接更新已有节点）
+  // Insert (or update) the preview line right after .setting-item-description
+  private attachPreview(settingEl: HTMLElement, text: string): HTMLElement {
+    let el = settingEl.querySelector<HTMLElement>('.auto-dl-live-preview');
+    if (!el) {
+      el = activeDocument.createElement('div');
+      el.className = 'auto-dl-live-preview';
+      el.style.fontFamily = 'var(--font-monospace)';
+      el.style.color = 'var(--text-accent)';
+      el.style.fontSize = 'var(--font-smallest)';
+      el.style.marginTop = '4px';
+      // 插到 .setting-item-description 之后，没有则追加到 settingEl 末尾
+      // Insert after .setting-item-description; fall back to appending to settingEl
+      const desc = settingEl.querySelector('.setting-item-description');
+      if (desc?.parentNode) {
+        desc.parentNode.insertBefore(el, desc.nextSibling);
+      } else {
+        settingEl.appendChild(el);
+      }
+    }
+    el.textContent = text;
+    return el;
   }
 
   display(): void {
@@ -306,7 +360,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
 
     // ── 路径模板（仅 customTemplate 模式显示）/ Path template ──────────────
     if (this.plugin.settings.attachmentPathMode === 'customTemplate') {
-      new Setting(containerEl)
+      const pathTemplateSetting = new Setting(containerEl)
         .setName(t.customTemplateFolderSettingName)
         .setDesc(t.customTemplateFolderSettingDesc)
         .addText(text => {
@@ -316,13 +370,22 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
             .onChange(async (value) => {
               this.plugin.settings.customTemplateFolder = value.trim() || 'assets/{date:YYYY-MM}';
               await this.plugin.saveSettings();
+              this.attachPreview(
+                pathTemplateSetting.settingEl,
+                t.previewLabel(this.buildPreview(this.plugin.settings.customTemplateFolder, t, 'path'))
+              );
             });
           text.inputEl.addClass('auto-dl-template-folder-input');
         });
+      // 初始预览 | Initial preview
+      this.attachPreview(
+        pathTemplateSetting.settingEl,
+        t.previewLabel(this.buildPreview(this.plugin.settings.customTemplateFolder, t, 'path'))
+      );
     }
 
     // ── 图片文件名模板 / Image filename template ──────────────────────────
-    new Setting(containerEl)
+    const nameSetting = new Setting(containerEl)
       .setName(t.imageNameTemplateSettingName)
       .setDesc(t.imageNameTemplateSettingDesc)
       .addText(text => {
@@ -332,8 +395,17 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.imageNameTemplate = value.trim() || '{notename}-{index:001}';
             await this.plugin.saveSettings();
+            this.attachPreview(
+              nameSetting.settingEl,
+              t.previewLabel(this.buildPreview(this.plugin.settings.imageNameTemplate, t, 'filename'))
+            );
           });
         text.inputEl.addClass('auto-dl-image-name-input');
       });
+    // 初始预览 | Initial preview
+    this.attachPreview(
+      nameSetting.settingEl,
+      t.previewLabel(this.buildPreview(this.plugin.settings.imageNameTemplate, t, 'filename'))
+    );
   }
 }
