@@ -32,8 +32,11 @@ export interface TranslationMap {
   imageNameTemplateSettingName:    string;
   imageNameTemplateSettingDesc:    string;
   imageNameTemplatePlaceholder:    string;
+  keepOriginalNameSettingName:     string;
+  keepOriginalNameSettingDesc:     string;
   previewLabel:                    (preview: string) => string;
   previewNoteName:                 string;
+  previewNotePath:                 string;
 
   noticeSuccess:           (count: number, name: string) => string;
   noticePartial:           (ok: number, fail: number, name: string) => string;
@@ -77,18 +80,21 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     pathModeObsidian:                 'Follow Obsidian settings',
     pathModeCustom:                   'Custom subfolder under the same directory as the note',
     pathModeSameName:                 'Subfolder with the same name as the note (under the same directory)',
-    pathModeCustomTemplate:           'Custom path template (from vault root)',
+    pathModeCustomTemplate:           'Custom path template',
     customFolderSettingName:          'Subfolder name',
     customFolderSettingDesc:          'Folder name relative to the note\'s directory. Default: attachments',
     customFolderPlaceholder:          'attachments',
     customTemplateFolderSettingName:  'Path template',
-    customTemplateFolderSettingDesc:  'Path from the vault root. Tokens: {date:FORMAT} (e.g. {date:YYYY-MM}), {notename}. Use / or \\ as separators. Example: _global/assets/{date:YYYY-MM}',
-    customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
+    customTemplateFolderSettingDesc:  'Where to save images, starting from the vault root. Use {notename} for the note name, {notepath} for the note\'s folder, {date:FORMAT} for the date (e.g. {date:YYYY-MM} becomes 2026-08). Extension is added automatically.',
+    customTemplateFolderPlaceholder:  'assets/{date:YYYY-MM}/{notename}',
     imageNameTemplateSettingName:     'Image filename template',
-    imageNameTemplateSettingDesc:     'Tokens: {notename}, {index:NNN} (NNN digits = padding width + start value, e.g. {index:000} → 000,001,…; {index:001} → 001,002,…), {date:FORMAT}. Extension is added automatically.',
+    imageNameTemplateSettingDesc:     'Use {notename} for the note name, {index:NNN} for a numeric suffix (e.g. {index:01} gives a two-digit counter starting from 01), {date:FORMAT} for the date. Extension is added automatically.',
     imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    keepOriginalNameSettingName:      'Keep original note name',
+    keepOriginalNameSettingDesc:      'When on, spaces in the note name are preserved instead of being converted to dashes. Characters illegal on the filesystem (\\ / : * ? " < > |) are always replaced.',
     previewLabel:                     (preview) => `→ ${preview}`,
     previewNoteName:                  'Note name',
+    previewNotePath:                  'note/folder',
 
     noticeSuccess:              (count, name) => `✅ Downloaded ${count} image(s) — ${name}`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}: ${ok} succeeded, ${fail} failed (original links kept)`,
@@ -133,18 +139,21 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     pathModeObsidian:                 '跟随 Obsidian 设置',
     pathModeCustom:                   '笔记所在目录下的指定子文件夹',
     pathModeSameName:                 '笔记所在目录下与笔记同名的子文件夹',
-    pathModeCustomTemplate:           '自定义路径模板（从 vault 根目录开始）',
+    pathModeCustomTemplate:           '自定义路径模板',
     customFolderSettingName:          '子文件夹名称',
     customFolderSettingDesc:          '相对于笔记所在目录的子文件夹名称，默认为 attachments',
     customFolderPlaceholder:          'attachments',
     customTemplateFolderSettingName:  '路径模板',
-    customTemplateFolderSettingDesc:  '从 vault 根目录开始的路径。可用占位符：{date:格式}（如 {date:YYYY-MM}）、{notename}（笔记名）。用 / 或 \\ 作为分隔符。示例：_global/assets/{date:YYYY-MM}',
-    customTemplateFolderPlaceholder:  '_global/assets/{date:YYYY-MM}',
+    customTemplateFolderSettingDesc:  '图片保存的位置，从库的根目录开始。可用 {notename} 代表笔记名，{notepath} 代表笔记所在文件夹，{date:日期格式} 代表日期（如 {date:YYYY-MM} 会转为如 2026-08 的年月形式）。',
+    customTemplateFolderPlaceholder:  'assets/{date:YYYY-MM}/{notename}',
     imageNameTemplateSettingName:     '图片文件名模板',
-    imageNameTemplateSettingDesc:     '可用占位符：{notename}（笔记名）、{index:NNN}（NNN 位数=补零宽度与起始值，如 {index:000}→000,001…；{index:001}→001,002…）、{date:格式}。扩展名自动追加。',
+    imageNameTemplateSettingDesc:     '图片文件名模板。可用 {notename} 代表笔记名，{index:NNN} 数字后缀（如 {index:01} 代表从 01 开始的两位数字序号），同样可以使用 {date:日期格式}。不需要填写后缀名。',
     imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    keepOriginalNameSettingName:      '保持原始笔记名',
+    keepOriginalNameSettingDesc:      '开启后，笔记名中的空格将被保留，不再转为短横。文件系统非法字符（\\ / : * ? " < > |）始终会被替换。',
     previewLabel:                     (preview) => `→ ${preview}`,
     previewNoteName:                  '笔记名',
+    previewNotePath:                  '笔记文件夹',
 
     noticeSuccess:              (count, name) => `✅ 图片下载完成：${count} 张（${name}）`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}：${ok} 张成功，${fail} 张失败（已保留原始链接）`,
@@ -186,6 +195,7 @@ export interface AutoDownloadSettings {
   customAttachmentFolder: string;
   customTemplateFolder:   string;
   imageNameTemplate:      string;
+  keepOriginalNoteName:   boolean;
 }
 
 export const DEFAULT_SETTINGS: AutoDownloadSettings = {
@@ -196,6 +206,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
   customAttachmentFolder: 'attachments',
   customTemplateFolder:   '_global/assets/{date:YYYY-MM}',
   imageNameTemplate:      '{notename}-img-p{index:001}',
+  keepOriginalNoteName:   false,
 };
 
 // ─── 设置页 / Settings tab ─────────────────────────────────────────────────
@@ -218,27 +229,29 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     return TRANSLATIONS[lang] ?? TRANSLATIONS['en']!;
   }
 
-  // 将模板渲染为预览字符串（{notename} 替换为占位词，其他 token 正常展开）
-  // Render a template to a preview string ({notename} → placeholder word, other tokens expanded normally)
+  // 将模板渲染为预览字符串（{notename}/{notepath} 替换为占位词，其他 token 正常展开）
+  // Render a template to a preview string ({notename}/{notepath} → placeholder words, other tokens expanded normally)
   private buildPreview(template: string, t: TranslationMap, mode: 'filename' | 'path'): string {
-    const placeholder = t.previewNoteName;
+    const keepSpaces = this.plugin.settings.keepOriginalNoteName;
+    const namePH   = t.previewNoteName;
+    const pathPH   = t.previewNotePath;
+    // 用哨兵字符替换两个 notename/notepath 占位符，展开其余 token 后再换回
+    // Use sentinel chars to replace notename/notepath, expand other tokens, then restore
+    const sentinel = (tpl: string) =>
+      tpl.replace(/{notepath}/g, '\x01').replace(/{notename}/g, '\x00');
+    const restore  = (s: string) =>
+      s.replace(/\x01/g, pathPH).replace(/\x00/g, namePH);
+
     if (mode === 'path') {
-      // 路径模式：按段展开，保留 /，不整体过 sanitize
-      // Path mode: expand per-segment, preserve /, skip full sanitize
+      // 路径模式：按段展开，保留 /
+      // Path mode: expand per-segment, preserve /
       const segments = template.replace(/\\/g, '/').split('/').filter(s => s.length > 0);
-      const expanded = segments.map(seg => {
-        let out = seg.replace(/{notename}/g, '\x00');
-        out = formatNameTemplate(out, '\x00', 0);
-        return out.replace(/\x00/g, placeholder);
-      });
+      const expanded = segments.map(seg => restore(formatNameTemplate(sentinel(seg), '\x00', 0, keepSpaces)));
       return expanded.join('/');
     }
     // 文件名模式：整体展开
     // Filename mode: expand as a whole
-    const withPlaceholder = template.replace(/{notename}/g, '\x00');
-    const expanded = formatNameTemplate(withPlaceholder, '\x00', 0);
-    const preview = expanded.replace(/\x00/g, placeholder);
-    return `${preview}.webp`;
+    return restore(formatNameTemplate(sentinel(template), '\x00', 0, keepSpaces)) + '.webp';
   }
 
   // 将预览行插入到 .setting-item-description 之后（或直接更新已有节点）
@@ -407,5 +420,21 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
       nameSetting.settingEl,
       t.previewLabel(this.buildPreview(this.plugin.settings.imageNameTemplate, t, 'filename'))
     );
+
+    // ── 保持原始笔记名 / Keep original note name ─────────────────────────
+    new Setting(containerEl)
+      .setName(t.keepOriginalNameSettingName)
+      .setDesc(t.keepOriginalNameSettingDesc)
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.keepOriginalNoteName)
+          .onChange(async (value) => {
+            this.plugin.settings.keepOriginalNoteName = value;
+            await this.plugin.saveSettings();
+            // 开关变化影响预览，整页刷新以同步所有预览
+            // The toggle affects previews; refresh the whole page to sync them
+            this.display();
+          });
+      });
   }
 }
