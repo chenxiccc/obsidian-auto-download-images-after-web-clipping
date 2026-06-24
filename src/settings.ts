@@ -231,7 +231,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
         out = formatNameTemplate(out, '\x00', 0);
         return out.replace(/\x00/g, placeholder);
       });
-      return expanded.join('/') + '/image.webp';
+      return expanded.join('/');
     }
     // 文件名模式：整体展开
     // Filename mode: expand as a whole
