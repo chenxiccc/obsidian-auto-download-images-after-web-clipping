@@ -36,7 +36,7 @@ Install from Obsidian Community Plugins: [Auto Download Images After Web Clippin
 - `{date:FORMAT}` — download date, e.g. `{date:YYYY-MM-DD}`
 - The file extension is added automatically from the downloaded image's type
 
-Default: `{notename}-img-{index:000}` → e.g. `My Note-img-000.webp`
+Default: `{notename}-img-p{index:001}` → e.g. `My Note-img-p001.webp`
 
 ---
 
@@ -72,4 +72,4 @@ Default: `{notename}-img-{index:000}` → e.g. `My Note-img-000.webp`
 - `{date:格式}` —— 下载日期，例如 `{date:YYYY-MM-DD}`
 - 文件扩展名根据下载图片的实际类型自动追加
 
-默认：`{notename}-img-{index:000}` → 例如 `我的笔记-img-000.webp`
+默认：`{notename}-img-p{index:001}` → 例如 `我的笔记-img-p001.webp`
