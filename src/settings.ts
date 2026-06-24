@@ -315,6 +315,8 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           });
         text.inputEl.rows = 6;
         text.inputEl.addClass('auto-dl-folder-input');
+        const ctrl = text.inputEl.parentElement;
+        if (ctrl) ctrl.style.flex = '0 0 auto';
       });
 
     // ── 触发延迟 / Debounce delay ─────────────────────────────────────────
