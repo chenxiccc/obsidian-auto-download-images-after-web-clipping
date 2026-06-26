@@ -26,6 +26,20 @@ export interface TranslationMap {
   customFolderSettingDesc: string;
   customFolderPlaceholder: string;
 
+  contextMenuSettingName:  string;
+  contextMenuSettingDesc:  string;
+  menuDownloadFolder:      string;
+  menuDownloadFile:        string;
+  confirmTitle:            string;
+  confirmBody:             (files: number, images: number, name: string) => string;
+  confirm:                 string;
+  cancel:                  string;
+  noticeFolderEmpty:       (name: string) => string;
+  noticeNoExternal:        (name: string) => string;
+  noticeCancelled:         string;
+  noticeBatchDone:         (name: string) => string;
+  noticeBatchProgress:     (done: number, total: number, name: string) => string;
+
   noticeSuccess:           (count: number, name: string) => string;
   noticePartial:           (ok: number, fail: number, name: string) => string;
   noticeWriteError:        (name: string) => string;
@@ -71,6 +85,20 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     customFolderSettingName:    'Subfolder name',
     customFolderSettingDesc:    'Folder name relative to the note\'s directory. Default: attachments',
     customFolderPlaceholder:    'attachments',
+
+    contextMenuSettingName:     'Add right-click menu',
+    contextMenuSettingDesc:     'Add a context-menu item to files and folders to download their external image links on demand.',
+    menuDownloadFolder:         'Download external images in this folder',
+    menuDownloadFile:           'Download external images in this file',
+    confirmTitle:               'Confirm download',
+    confirmBody:                (files, images, name) => `Found ${images} external image(s) across ${files} markdown file(s) under "${name}". Download them all?`,
+    confirm:                    'Download',
+    cancel:                     'Cancel',
+    noticeFolderEmpty:          (name) => `No markdown files under "${name}"`,
+    noticeNoExternal:           (name) => `No external images found under "${name}"`,
+    noticeCancelled:            'Cancelled',
+    noticeBatchDone:            (name) => `Finished downloading external images in "${name}"`,
+    noticeBatchProgress:        (done, total, name) => `Downloaded external images in ${done}/${total} file(s) under "${name}"...`,
 
     noticeSuccess:              (count, name) => `✅ Downloaded ${count} image(s) — ${name}`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}: ${ok} succeeded, ${fail} failed (original links kept)`,
@@ -119,6 +147,20 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     customFolderSettingDesc:    '相对于笔记所在目录的子文件夹名称，默认为 attachments',
     customFolderPlaceholder:    'attachments',
 
+    contextMenuSettingName:     '添加右键菜单',
+    contextMenuSettingDesc:     '给文件和文件夹添加右键菜单项，按需下载其中的外部图片链接。',
+    menuDownloadFolder:         '下载该文件夹的外部图片',
+    menuDownloadFile:           '下载该文件的外部图片',
+    confirmTitle:               '确认下载',
+    confirmBody:                (files, images, name) => `在「${name}」下发现 ${images} 张外部图片，分布于 ${files} 个 Markdown 文件。是否全部下载？`,
+    confirm:                    '下载',
+    cancel:                     '取消',
+    noticeFolderEmpty:          (name) => `「${name}」下没有 Markdown 文件`,
+    noticeNoExternal:           (name) => `「${name}」下没有外部图片`,
+    noticeCancelled:            '已取消',
+    noticeBatchDone:            (name) => `已完成「${name}」中外部图片的下载`,
+    noticeBatchProgress:        (done, total, name) => `正在下载「${name}」中的外部图片：${done}/${total} 个文件已完成……`,
+
     noticeSuccess:              (count, name) => `✅ 图片下载完成：${count} 张（${name}）`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}：${ok} 张成功，${fail} 张失败（已保留原始链接）`,
     noticeWriteError:           (name) => `[AutoDL] 写回 ${name} 失败，请查看控制台日志`,
@@ -157,6 +199,7 @@ export interface AutoDownloadSettings {
   language:               Language;
   attachmentPathMode:     AttachmentPathMode;
   customAttachmentFolder: string;
+  enableContextMenu:      boolean;
 }
 
 export const DEFAULT_SETTINGS: AutoDownloadSettings = {
@@ -165,6 +208,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
   language:               'auto',
   attachmentPathMode:     'obsidian',
   customAttachmentFolder: 'attachments',
+  enableContextMenu:      false,
 };
 
 // ─── 设置页 / Settings tab ─────────────────────────────────────────────────
@@ -277,5 +321,18 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           text.inputEl.addClass('auto-dl-custom-folder-input');
         });
     }
+
+    // ── 右键菜单 / Context menu ──────────────────────────────────────────
+    new Setting(containerEl)
+      .setName(t.contextMenuSettingName)
+      .setDesc(t.contextMenuSettingDesc)
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.enableContextMenu)
+          .onChange(async (value) => {
+            this.plugin.settings.enableContextMenu = value;
+            await this.plugin.saveSettings();
+          });
+      });
   }
 }
