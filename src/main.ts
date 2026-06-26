@@ -87,20 +87,20 @@ interface HttpsModule {
 
 // 根据 useMarkdownLinks 生成最终的图片引用字符串（遵循 Obsidian「文件与链接」设置）
 // Generate image reference string based on useMarkdownLinks (follows Obsidian "Files & Links" setting)
-function formatImageLink(destPath: string, alt: string, useMarkdownLinks: boolean): string {
+function formatImageLink(linkText: string, alt: string, useMarkdownLinks: boolean): string {
   return useMarkdownLinks
-    ? `![${alt}](<${destPath}>)`
-    : `![[${destPath}]]`;
+    ? `![${alt}](<${linkText}>)`
+    : `![[${linkText}]]`;
 }
 
 // 为带链接的图片生成最终引用格式：[![alt](img)](link) 的替换
 // 在 wikilink 模式下丢弃外层链接（wikilink 不支持嵌套在 markdown 链接中），markdown 模式下保留
 // Generate final reference for linked images: replacement for [![alt](img)](link)
 // In wikilink mode, discard outer link (wikilink can't be nested in markdown links); preserve in markdown mode
-function formatLinkedImageLink(destPath: string, alt: string, linkUrl: string, useMarkdownLinks: boolean): string {
+function formatLinkedImageLink(linkText: string, alt: string, linkUrl: string, useMarkdownLinks: boolean): string {
   return useMarkdownLinks
-    ? `[![${alt}](<${destPath}>)](${linkUrl})`
-    : `![[${destPath}]]`;
+    ? `[![${alt}](<${linkText}>)](${linkUrl})`
+    : `![[${linkText}]]`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -351,6 +351,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           await this.app.vault.process(file, (currentContent) => {
             let updated = currentContent;
             for (const [url, destPath] of urlToLocal) {
+              const linkText = this.resolveLinkText(destPath, file);
               const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
               const linkedMdRe = new RegExp(
@@ -358,7 +359,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
                 'g'
               );
               updated = updated.replace(linkedMdRe, (_, alt: string, linkUrl: string) =>
-                formatLinkedImageLink(destPath, alt, linkUrl, useMarkdownLinks)
+                formatLinkedImageLink(linkText, alt, linkUrl, useMarkdownLinks)
               );
 
               const mdRe = new RegExp(
@@ -366,7 +367,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
                 'g'
               );
               updated = updated.replace(mdRe, (_, alt: string) =>
-                formatImageLink(destPath, alt, useMarkdownLinks)
+                formatImageLink(linkText, alt, useMarkdownLinks)
               );
 
               const htmlRe = new RegExp(
@@ -376,7 +377,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
               updated = updated.replace(htmlRe, (fullTag: string) => {
                 const altMatch = fullTag.match(/\balt=(?:"([^"]*)"|'([^']*)')/i);
                 const alt = altMatch ? (altMatch[1] ?? altMatch[2] ?? '') : '';
-                return formatImageLink(destPath, alt, useMarkdownLinks);
+                return formatImageLink(linkText, alt, useMarkdownLinks);
               });
             }
             return updated;
@@ -600,6 +601,41 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       return config.useMarkdownLinks === true;
     } catch {
       return false;
+    }
+  }
+
+  // 根据设置把已下载图片的 vault 绝对路径转换成嵌入链接中使用的路径文本
+  // Convert a downloaded image's absolute vault path to the link-text used inside embeds, per settings
+  resolveLinkText(destPath: string, noteFile: TFile): string {
+    const posix = destPath.replace(/\\/g, '/');
+
+    let format: string = this.settings.linkPathFormat ?? 'obsidian';
+    if (format === 'obsidian') {
+      const vaultWithConfig = this.app.vault as typeof this.app.vault & { getConfig(key: string): unknown };
+      format = (vaultWithConfig.getConfig('newLinkFormat') as string) ?? 'shortest';
+    }
+
+    switch (format) {
+      case 'absolute':
+        return posix;
+
+      case 'relative': {
+        const dir = (noteFile.parent?.path ?? '').replace(/\\/g, '/');
+        if (!dir) return posix;
+        const prefix = dir + '/';
+        return posix.startsWith(prefix) ? posix.slice(prefix.length) : posix;
+      }
+
+      case 'shortest':
+      default: {
+        // 复用 Obsidian 的最短唯一路径解析（若拿不到 TFile 则回退绝对路径）
+        // Reuse Obsidian's shortest-unique-path resolution (fall back to absolute if no TFile)
+        const tf = this.app.vault.getAbstractFileByPath(destPath);
+        if (tf instanceof TFile) {
+          return this.app.metadataCache.fileToLinktext(tf, noteFile.path);
+        }
+        return posix;
+      }
     }
   }
 
