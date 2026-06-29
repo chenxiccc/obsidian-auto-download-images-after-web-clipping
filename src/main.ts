@@ -85,22 +85,22 @@ interface HttpsModule {
 
 // ─── 工具函数 / Utility functions ──────────────────────────────────────────
 
-// 根据 useMarkdownLinks 生成最终的图片引用字符串（遵循 Obsidian「文件与链接」设置）
-// Generate image reference string based on useMarkdownLinks (follows Obsidian "Files & Links" setting)
-function formatImageLink(destPath: string, alt: string, useMarkdownLinks: boolean): string {
+// 根据是否使用 markdown 链接，生成最终的图片引用字符串（语法遵循 Obsidian「文件与链接 → 使用 Wiki 格式」；路径文本由 resolveLinkText 解析，已跟随「内部链接类型」）
+// Generate image reference string. Syntax follows Obsidian "Files & Links → Use Wiki Links"; link-text is resolved by resolveLinkText and already follows "New link format"
+function formatImageLink(linkText: string, alt: string, useMarkdownLinks: boolean): string {
   return useMarkdownLinks
-    ? `![${alt}](<${destPath}>)`
-    : `![[${destPath}]]`;
+    ? `![${alt}](<${linkText}>)`
+    : `![[${linkText}]]`;
 }
 
 // 为带链接的图片生成最终引用格式：[![alt](img)](link) 的替换
 // 在 wikilink 模式下丢弃外层链接（wikilink 不支持嵌套在 markdown 链接中），markdown 模式下保留
 // Generate final reference for linked images: replacement for [![alt](img)](link)
 // In wikilink mode, discard outer link (wikilink can't be nested in markdown links); preserve in markdown mode
-function formatLinkedImageLink(destPath: string, alt: string, linkUrl: string, useMarkdownLinks: boolean): string {
+function formatLinkedImageLink(linkText: string, alt: string, linkUrl: string, useMarkdownLinks: boolean): string {
   return useMarkdownLinks
-    ? `[![${alt}](<${destPath}>)](${linkUrl})`
-    : `![[${destPath}]]`;
+    ? `[![${alt}](<${linkText}>)](${linkUrl})`
+    : `![[${linkText}]]`;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -173,9 +173,6 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
 
   // 缓存的监听文件夹列表 | Cached watched folders list
   _watchedFolders: string[];
-
-  // 缓存的 Obsidian「使用 Wiki 链接」设置 | Cached Obsidian "Use Wiki Links" setting
-  _useMarkdownLinks: boolean;
 
   // 缓存的 User-Agent（复用 Obsidian 自带的 UA）
   // Cached User-Agent (reuses Obsidian's own UA)
@@ -309,7 +306,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         .replace(/\s+/g, '-')
         .replace(/[\\/:*?"<>|]/g, '_');
 
-      const urlToLocal = new Map<string, string>();
+      const urlToLocal = new Map<string, { destPath: string; tfile: TFile | null }>();
       const failedUrls: string[]  = [];
       let savedCount = 1;
 
@@ -335,22 +332,38 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         const destPath = await this.resolveDestPath(attachmentFolder, rawName);
 
         try {
-          await this.app.vault.adapter.writeBinary(destPath, buffer);
-          urlToLocal.set(url, destPath);
+          // 高层 API：返回 TFile 并立即注册进文件抽象层，供 fileToLinktext 使用
+          // High-level API: returns TFile and registers it in the file abstraction layer immediately for fileToLinktext
+          const tf = await this.app.vault.createBinary(destPath, buffer);
+          urlToLocal.set(url, { destPath, tfile: tf });
           savedCount++;
         } catch (err) {
-          this.failedUrls.add(url);
-          failedUrls.push(url);
-          console.error(t.consoleWriteFailed(destPath, err));
+          // TOCTOU 兜底：resolveDestPath 探测后极短窗口内被占用导致 createBinary 抛错，回退可覆盖写入
+          // TOCTOU fallback: createBinary throws if the path is taken in the tiny window after resolveDestPath; fall back to overwrite-capable write
+          try {
+            await this.app.vault.adapter.writeBinary(destPath, buffer);
+            urlToLocal.set(url, { destPath, tfile: null });
+            savedCount++;
+          } catch (err2) {
+            this.failedUrls.add(url);
+            failedUrls.push(url);
+            console.error(t.consoleWriteFailed(destPath, err2));
+          }
         }
       }
 
       if (urlToLocal.size > 0) {
-        const useMarkdownLinks = this._useMarkdownLinks;
+        // 实时读取 Obsidian「使用 Wiki 格式」设置，与 newLinkFormat 的实时性对齐
+        // Read Obsidian "Use Wiki Links" setting live, aligned with newLinkFormat's live behavior
+        const vaultWithConfig = this.app.vault as typeof this.app.vault & { getConfig(key: string): unknown };
+        const useMarkdownLinks = (vaultWithConfig.getConfig('useMarkdownLinks') as boolean) ?? false;
         try {
           await this.app.vault.process(file, (currentContent) => {
             let updated = currentContent;
-            for (const [url, destPath] of urlToLocal) {
+            for (const [url, { destPath, tfile }] of urlToLocal) {
+              // 把目标路径解析为跟随 Obsidian「内部链接类型」的链接文本
+              // Resolve the destination path into link-text that follows Obsidian "New link format"
+              const linkText = this.resolveLinkText(tfile, destPath, file);
               const urlEscaped = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
               const linkedMdRe = new RegExp(
@@ -358,7 +371,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
                 'g'
               );
               updated = updated.replace(linkedMdRe, (_, alt: string, linkUrl: string) =>
-                formatLinkedImageLink(destPath, alt, linkUrl, useMarkdownLinks)
+                formatLinkedImageLink(linkText, alt, linkUrl, useMarkdownLinks)
               );
 
               const mdRe = new RegExp(
@@ -366,7 +379,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
                 'g'
               );
               updated = updated.replace(mdRe, (_, alt: string) =>
-                formatImageLink(destPath, alt, useMarkdownLinks)
+                formatImageLink(linkText, alt, useMarkdownLinks)
               );
 
               const htmlRe = new RegExp(
@@ -376,7 +389,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
               updated = updated.replace(htmlRe, (fullTag: string) => {
                 const altMatch = fullTag.match(/\balt=(?:"([^"]*)"|'([^']*)')/i);
                 const alt = altMatch ? (altMatch[1] ?? altMatch[2] ?? '') : '';
-                return formatImageLink(destPath, alt, useMarkdownLinks);
+                return formatImageLink(linkText, alt, useMarkdownLinks);
               });
             }
             return updated;
@@ -584,6 +597,24 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     }
   }
 
+  // 把已下载图片的 TFile 转成嵌入链接中使用的路径文本（遵循 Obsidian「文件与链接 → 内部链接类型」）
+  // Convert a downloaded image's TFile into the link-text used inside embeds (follows Obsidian "Files & Links → New link format")
+  // fileToLinktext 内部已按 newLinkFormat(shortest/relative/absolute) 输出，无需在此分支
+  // fileToLinktext already outputs per newLinkFormat(shortest/relative/absolute); no branching needed here
+  resolveLinkText(imageFile: TFile | null, destPath: string, noteFile: TFile): string {
+    if (imageFile) {
+      return this.app.metadataCache.fileToLinktext(imageFile, noteFile.path);
+    }
+    // 兜底（仅写入回退分支无 TFile 时）：再尝试一次按路径取 TFile，取不到退绝对路径
+    // Fallback (only when write-fallback branch has no TFile): retry by path, else absolute path
+    const posix = destPath.replace(/\\/g, '/');
+    const tf = this.app.vault.getAbstractFileByPath(posix);
+    if (tf instanceof TFile) {
+      return this.app.metadataCache.fileToLinktext(tf, noteFile.path);
+    }
+    return posix;
+  }
+
   extractExt(url: string): string {
     const parts = url.split('?');
     const noQuery = parts[0] ?? url;
@@ -592,22 +623,10 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     return m ? `.${(m[1] ?? 'jpg').toLowerCase()}` : DEFAULT_EXT;
   }
 
-  private async resolveUseMarkdownLinks(): Promise<boolean> {
-    try {
-      const configPath = `${this.app.vault.configDir}/app.json`;
-      const raw = await this.app.vault.adapter.read(configPath);
-      const config = JSON.parse(raw) as Record<string, unknown>;
-      return config.useMarkdownLinks === true;
-    } catch {
-      return false;
-    }
-  }
-
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData() as Partial<AutoDownloadSettings>);
     this._resolvedLang   = this.settings.language === 'auto' ? detectObsidianLang() : this.settings.language;
     this._watchedFolders = parseFolders(this.settings.watchFolders);
-    this._useMarkdownLinks = await this.resolveUseMarkdownLinks();
     const { userAgent } = window.navigator;
     this._userAgent = userAgent;
   }
@@ -616,6 +635,5 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     await this.saveData(this.settings);
     this._resolvedLang   = this.settings.language === 'auto' ? detectObsidianLang() : this.settings.language;
     this._watchedFolders = parseFolders(this.settings.watchFolders);
-    this._useMarkdownLinks = await this.resolveUseMarkdownLinks();
   }
 }
