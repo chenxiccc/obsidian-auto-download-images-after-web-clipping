@@ -328,7 +328,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
 
         const rawName = `${titleBase}-${savedCount}${ext}`
           .replace(/\s+/g, '-')
-          .replace(/[\\:*?"<>|]/g, '_');
+          .replace(/[\\/:*?"<>|]/g, '_');
         const destPath = await this.resolveDestPath(attachmentFolder, rawName);
 
         try {
