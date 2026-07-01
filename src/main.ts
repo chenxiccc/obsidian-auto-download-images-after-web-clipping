@@ -283,10 +283,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         return;
       }
 
-      // matchAll 的类型在 ES2020+ 才有声明，这里用 as 收窄（项目 lib: ES7）
-      // matchAll type is only declared in ES2020+; narrow with as (project lib: ES7)
-      const mdMatches   = [...content.matchAll(MD_IMAGE_REGEX)] as RegExpMatchArray[];
-      const htmlMatches = [...content.matchAll(HTML_IMG_REGEX)] as RegExpMatchArray[];
+      const mdMatches   = [...content.matchAll(MD_IMAGE_REGEX)];
+      const htmlMatches = [...content.matchAll(HTML_IMG_REGEX)];
       if (mdMatches.length === 0 && htmlMatches.length === 0) return;
 
       const cachedMetadata = this.app.metadataCache.getFileCache(file);
