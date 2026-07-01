@@ -1,4 +1,8 @@
-/* global Buffer -- Node.js global available in Electron renderer */
+// Node.js Buffer 的最小类型声明（Electron 渲染进程可用，isDesktopOnly: true 保证始终存在）
+// Minimal type declaration for Node.js Buffer (available in Electron renderer, guaranteed by isDesktopOnly: true)
+declare class Buffer extends Uint8Array {
+  static concat(list: Buffer[]): Buffer;
+}
 
 import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
 import {
@@ -293,8 +297,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       }
 
       const allUrls = [
-        ...mdMatches.map(m => m[2]),
-        ...htmlMatches.map(m => m[1] ?? m[2]),
+        ...mdMatches.map(m => m[2] as string),
+        ...htmlMatches.map(m => (m[1] ?? m[2]) as string),
       ].filter((u): u is string => Boolean(u));
       const uniqueUrls = [...new Set(allUrls)].filter(u => !this.failedUrls.has(u));
       if (uniqueUrls.length === 0) return;
@@ -337,7 +341,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           const tf = await this.app.vault.createBinary(destPath, buffer);
           urlToLocal.set(url, { destPath, tfile: tf });
           savedCount++;
-        } catch (err) {
+        } catch (_err) {
           // TOCTOU 兜底：resolveDestPath 探测后极短窗口内被占用导致 createBinary 抛错，回退可覆盖写入
           // TOCTOU fallback: createBinary throws if the path is taken in the tiny window after resolveDestPath; fall back to overwrite-capable write
           try {
