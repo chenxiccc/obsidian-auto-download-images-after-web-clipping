@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-auto-download-images-after-web-clipping",
-	"version": "2.0.1",
+	"version": "2.1.0",
 	"description": "Automatically download remote images to local vault after web clipping.",
 	"main": "main.js",
 	"type": "module",
