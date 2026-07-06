@@ -4,7 +4,7 @@ declare class Buffer extends Uint8Array {
   static concat(list: Buffer[]): Buffer;
 }
 
-import { Notice, Plugin, TFile, normalizePath } from 'obsidian';
+import { Modal, Notice, Plugin, TFile, TFolder, normalizePath } from 'obsidian';
 import {
   AutoDownloadSettings,
   AutoDownloadSettingTab,
@@ -33,6 +33,12 @@ const RETRY_DELAY_MS = 1500;
 
 // 同时下载图片的最大并发数 | Maximum number of concurrent image downloads
 const DOWNLOAD_CONCURRENCY = 3;
+
+// 文件夹批量下载时同时处理的文件数 | Maximum number of files processed concurrently during folder batch downloads
+const BATCH_FILE_CONCURRENCY = 2;
+
+// 文件夹批量下载进度提示间隔 | Progress notice interval for folder batch downloads
+const BATCH_PROGRESS_INTERVAL = 10;
 
 // HTTP 重定向最大跟随次数 | Maximum number of redirect hops to follow
 const MAX_REDIRECTS = 5;
@@ -85,6 +91,12 @@ interface HttpsOptions {
 
 interface HttpsModule {
   get(options: HttpsOptions, callback: (res: HttpsResponse) => void): HttpsRequest;
+}
+
+interface ExternalImageScanResult {
+  file: TFile;
+  content: string;
+  imageCount: number;
 }
 
 // ─── 工具函数 / Utility functions ──────────────────────────────────────────
@@ -225,6 +237,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
 
   // 本次会话内下载失败/跳过的 URL 黑名单，避免反复重试
   // Session-level blacklist of failed/skipped URLs to avoid repeated retries
+  // 批量下载也共享该黑名单：同一 URL 在某个文件失败后，后续文件会跳过它，避免重复失败。
+  // Folder batch downloads share this blacklist: after one file fails a URL, later files skip it to avoid repeated failures.
   private failedUrls: Set<string>;
 
   // 每个文件的防抖计时器 | Debounce timers per file
@@ -280,6 +294,31 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           void this.downloadImagesInFile(file);
         }, this.settings.delayMs);
         this.debounceTimers.set(file.path, timer);
+      })
+    );
+
+    // 右键菜单：给文件 / 文件夹加入「按需下载外部图片」入口
+    // Context menu: on-demand download entry for files and folders
+    this.registerEvent(
+      this.app.workspace.on('file-menu', (menu, file) => {
+        if (!this.settings.enableContextMenu) return;
+        const t = this.t;
+
+        if (file instanceof TFolder) {
+          menu.addItem(item => {
+            item
+              .setTitle(t.menuDownloadFolder)
+              .setIcon('download')
+              .onClick(() => { void this.downloadFolderExternalImages(file); });
+          });
+        } else if (file instanceof TFile && file.extension === 'md') {
+          menu.addItem(item => {
+            item
+              .setTitle(t.menuDownloadFile)
+              .setIcon('download')
+              .onClick(() => { void this.downloadImagesInFile(file); });
+          });
+        }
       })
     );
 
@@ -362,22 +401,24 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     return formatNameTemplate(template, noteName, index, this.settings.keepOriginalNoteName);
   }
 
-  async downloadImagesInFile(file: TFile): Promise<void> {
+  async downloadImagesInFile(file: TFile, cachedContent?: string): Promise<void> {
     if (this.processingFiles.has(file.path)) return;
     this.processingFiles.add(file.path);
 
     const t = this.t;
 
     try {
-      let content: string;
-      try {
-        content = await this.app.vault.read(file);
-      } catch (err) {
-        console.error(t.consoleReadError, err);
-        return;
+      let content = cachedContent;
+      if (content === undefined) {
+        try {
+          content = await this.app.vault.read(file);
+        } catch (err) {
+          console.error(t.consoleReadError, err);
+          return;
+        }
       }
 
-      const mdMatches   = [...content.matchAll(MD_IMAGE_REGEX)];
+      const mdMatches = [...content.matchAll(MD_IMAGE_REGEX)];
       const htmlMatches = [...content.matchAll(HTML_IMG_REGEX)];
       if (mdMatches.length === 0 && htmlMatches.length === 0) return;
 
@@ -390,11 +431,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         console.debug(t.consoleRefererFallback);
       }
 
-      const allUrls = [
-        ...mdMatches.map(m => m[2] as string),
-        ...htmlMatches.map(m => (m[1] ?? m[2]) as string),
-      ].filter((u): u is string => Boolean(u));
-      const uniqueUrls = [...new Set(allUrls)].filter(u => !this.failedUrls.has(u));
+      const uniqueUrls = this.extractExternalUrls(content).filter(u => !this.failedUrls.has(u));
       if (uniqueUrls.length === 0) return;
 
       const attachmentFolder = this.resolveAttachmentFolder(file);
@@ -507,6 +544,117 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
     } finally {
       this.processingFiles.delete(file.path);
     }
+  }
+
+  // ── 右键菜单：批量下载 / Context menu: batch download ─────────────────────
+
+  // 从正文提取去重后的外部图片 URL 列表（markdown 图片 + HTML img 标签）
+  // Extract de-duplicated external image URLs from content (markdown images + HTML img tags)
+  extractExternalUrls(content: string): string[] {
+    const mdMatches   = [...content.matchAll(MD_IMAGE_REGEX)];
+    const htmlMatches = [...content.matchAll(HTML_IMG_REGEX)];
+    const allUrls = [
+      ...mdMatches.map(m => m[2]),
+      ...htmlMatches.map(m => m[1] ?? m[2]),
+    ].filter((u): u is string => Boolean(u));
+    return [...new Set(allUrls)];
+  }
+
+  // 递归收集某文件夹下所有 .md 文件 | Recursively collect all .md files under a folder
+  private collectMarkdownFiles(folder: TFolder): TFile[] {
+    const result: TFile[] = [];
+    const stack: TFolder[] = [folder];
+    while (stack.length > 0) {
+      const cur = stack.pop()!;
+      for (const child of cur.children) {
+        if (child instanceof TFile && child.extension === 'md') {
+          result.push(child);
+        } else if (child instanceof TFolder) {
+          stack.push(child);
+        }
+      }
+    }
+    return result;
+  }
+
+  // 扫描文件列表，统计含外部图片的文件数与外部图片总数（用于确认弹窗）
+  // Scan files to count those containing external images and the total external image count (for the confirm dialog)
+  private async scanExternalImages(files: TFile[]): Promise<ExternalImageScanResult[]> {
+    const scanResults: ExternalImageScanResult[] = [];
+    await runWithConcurrency(files.map(f => async () => {
+      try {
+        const content = await this.app.vault.read(f);
+        const urls = this.extractExternalUrls(content);
+        if (urls.length > 0) {
+          scanResults.push({ file: f, content, imageCount: urls.length });
+        }
+      } catch (err) {
+        console.warn(this.t.consoleReadError, err);
+      }
+    }), BATCH_FILE_CONCURRENCY);
+    return scanResults;
+  }
+
+  async downloadFolderExternalImages(folder: TFolder): Promise<void> {
+    const t = this.t;
+    const mdFiles = this.collectMarkdownFiles(folder);
+    if (mdFiles.length === 0) {
+      new Notice(t.noticeFolderEmpty(folder.name));
+      return;
+    }
+
+    const scanResults = await this.scanExternalImages(mdFiles);
+    const filesWithImages = scanResults.length;
+    const totalImages = scanResults.reduce((sum, result) => sum + result.imageCount, 0);
+    if (totalImages === 0) {
+      new Notice(t.noticeNoExternal(folder.name));
+      return;
+    }
+
+    const confirmed = await this.confirmDialog(
+      t.confirmTitle,
+      t.confirmBody(filesWithImages, totalImages, folder.name),
+    );
+    if (!confirmed) {
+      new Notice(t.noticeCancelled);
+      return;
+    }
+
+    let completedFiles = 0;
+    await runWithConcurrency(scanResults.map(result => async () => {
+      await this.downloadImagesInFile(result.file, result.content);
+      completedFiles++;
+      if (completedFiles % BATCH_PROGRESS_INTERVAL === 0 || completedFiles === scanResults.length) {
+        new Notice(t.noticeBatchProgress(completedFiles, scanResults.length, folder.name));
+      }
+    }), BATCH_FILE_CONCURRENCY);
+    new Notice(t.noticeBatchDone(folder.name));
+  }
+
+  // 简易确认弹窗：返回用户是否点击了主操作按钮
+  // Minimal confirm dialog: resolves to whether the primary button was clicked
+  private confirmDialog(title: string, body: string): Promise<boolean> {
+    const t = this.t;
+    return new Promise(resolve => {
+      const modal = new Modal(this.app);
+      let clicked = false;
+      modal.titleEl.setText(title);
+      modal.contentEl.createEl('p', { text: body });
+
+      const btns = modal.contentEl.createDiv({ cls: 'modal-button-container' });
+      const cancelBtn = btns.createEl('button', { text: t.cancel });
+      cancelBtn.addEventListener('click', () => { modal.close(); });
+      const okBtn = btns.createEl('button', { text: t.confirm, cls: 'mod-cta' });
+      okBtn.addEventListener('click', () => {
+        clicked = true;
+        modal.close();
+      });
+
+      modal.onClose = () => {
+        resolve(clicked);
+      };
+      modal.open();
+    });
   }
 
   // ── 下载方法 / Download methods ──────────────────────────────────────────
