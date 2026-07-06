@@ -427,7 +427,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
             .setPlaceholder(t.customTemplateFolderPlaceholder)
             .setValue(this.plugin.settings.customTemplateFolder)
             .onChange(async (value) => {
-              this.plugin.settings.customTemplateFolder = value.trim() || 'assets/{date:YYYY-MM}';
+              this.plugin.settings.customTemplateFolder = value.trim() || '_global/assets/{date:YYYY-MM}';
               await this.plugin.saveSettings();
               this.attachPreview(
                 pathTemplateSetting.settingEl,

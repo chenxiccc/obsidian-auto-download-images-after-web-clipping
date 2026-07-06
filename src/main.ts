@@ -363,7 +363,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       case 'customTemplate': {
         // 路径模板从 vault 根目录解析，支持 {date:FORMAT} 和 {notename} 占位符
         // Path template resolved from vault root, supports {date:FORMAT} and {notename} tokens
-        return this.formatPathTemplate(customTemplateFolder || 'assets/{date:YYYY-MM}', file);
+        return this.formatPathTemplate(customTemplateFolder || '_global/assets/{date:YYYY-MM}', file);
       }
       default:
         return normalizePath('attachments');
