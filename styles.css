@@ -16,3 +16,18 @@
 .auto-dl-custom-folder-input {
   width: 200px;
 }
+
+/* 模板实时预览行：等宽强调色小字 */
+/* Template live preview line: monospace accent small text */
+.auto-dl-live-preview {
+  font-family: var(--font-monospace);
+  color: var(--text-accent);
+  font-size: var(--font-smallest);
+  margin-top: 4px;
+}
+
+/* 监听文件夹输入框容器：防止 flex 撑开 */
+/* Watch folder input container: prevent flex stretch */
+.auto-dl-folder-input-container {
+  flex: 0 0 auto;
+}

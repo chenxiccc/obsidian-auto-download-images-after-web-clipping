@@ -284,7 +284,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     const sentinel = (tpl: string) =>
       tpl.replace(/{notepath}/g, '\x01').replace(/{notename}/g, '\x00');
     const restore  = (s: string) =>
-      s.replace(/\x01/g, pathPH).replace(/\x00/g, namePH);
+      s.split('\x01').join(pathPH).split('\x00').join(namePH);
 
     if (mode === 'path') {
       // 路径模式：按段展开，保留 /
@@ -305,10 +305,6 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     if (!el) {
       el = activeDocument.createElement('div');
       el.className = 'auto-dl-live-preview';
-      el.style.fontFamily = 'var(--font-monospace)';
-      el.style.color = 'var(--text-accent)';
-      el.style.fontSize = 'var(--font-smallest)';
-      el.style.marginTop = '4px';
       // 插到 .setting-item-description 之后，没有则追加到 settingEl 末尾
       // Insert after .setting-item-description; fall back to appending to settingEl
       const desc = settingEl.querySelector('.setting-item-description');
@@ -360,7 +356,7 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
         text.inputEl.rows = 6;
         text.inputEl.addClass('auto-dl-folder-input');
         const ctrl = text.inputEl.parentElement;
-        if (ctrl) ctrl.style.flex = '0 0 auto';
+        if (ctrl) ctrl.addClass('auto-dl-folder-input-container');
       });
 
     // ── 触发延迟 / Debounce delay ─────────────────────────────────────────
