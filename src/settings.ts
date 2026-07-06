@@ -111,7 +111,7 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     previewNotePath:                  'note/folder',
 
     contextMenuSettingName:     'Add right-click menu',
-    contextMenuSettingDesc:     'Add a context-menu item to files and folders to download their external image links on demand.',
+    contextMenuSettingDesc:     'Add a right-click menu to files and folders for manually downloading external images on demand.',
     menuDownloadFolder:         'Download external images in this folder',
     menuDownloadFile:           'Download external images in this file',
     confirmTitle:               'Confirm download',
@@ -184,7 +184,7 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     previewNotePath:                  '笔记文件夹',
 
     contextMenuSettingName:     '添加右键菜单',
-    contextMenuSettingDesc:     '给文件和文件夹添加右键菜单项，按需下载其中的外部图片链接。',
+    contextMenuSettingDesc:     '给文件和文件夹增加右键菜单，可手动按需下载其中的外部图片。',
     menuDownloadFolder:         '下载该文件夹的外部图片',
     menuDownloadFile:           '下载该文件的外部图片',
     confirmTitle:               '确认下载',
