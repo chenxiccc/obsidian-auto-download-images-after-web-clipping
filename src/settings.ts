@@ -248,7 +248,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
   attachmentPathMode:     'obsidian',
   customAttachmentFolder: 'attachments',
   customTemplateFolder:   '_global/assets/{date:YYYY-MM}',
-  imageNameTemplate:      '{notename}-img-p{index:001}',
+  imageNameTemplate:      '{notename}-{index:1}',
   keepOriginalNoteName:   false,
   enableContextMenu:      false,
 };
