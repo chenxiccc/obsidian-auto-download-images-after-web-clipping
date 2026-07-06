@@ -257,7 +257,7 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
 
 import { App, PluginSettingTab, Setting, getLanguage } from 'obsidian';
 import type AutoDownloadAttachmentsPlugin from './main';
-import { formatDateToken, formatNameTemplate } from './main';
+import { formatNameTemplate } from './main';
 
 export class AutoDownloadSettingTab extends PluginSettingTab {
   plugin: AutoDownloadAttachmentsPlugin;
