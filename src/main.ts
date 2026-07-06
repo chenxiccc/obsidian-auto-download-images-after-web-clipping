@@ -118,12 +118,70 @@ function parseFolders(raw: string): string[] {
     .filter(s => s.length > 0);
 }
 
-function sanitizeFolderName(name: string): string {
-  return name
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .replace(/\s+/g, '-')
-    .replace(/^[.\s]+|[.\s]+$/g, '')
-    || 'attachments';
+// 文件夹名清理：非法字符→下划线；keepSpaces=false 时空白→短横
+// Sanitize a folder name: illegal chars→underscore; whitespace→dash unless keepSpaces
+function sanitizeFolderName(name: string, keepSpaces = false): string {
+  let out = name.replace(/[\\/:*?"<>|]/g, '_');
+  if (!keepSpaces) out = out.replace(/\s+/g, '-');
+  out = out.replace(/^[.\s]+|[.\s]+$/g, '');
+  return out || 'attachments';
+}
+
+// 笔记名清理：非法字符→下划线；keepSpaces=false 时空白→短横
+// Sanitize a note name: illegal chars→underscore; whitespace→dash unless keepSpaces
+function sanitizeNoteName(basename: string, keepSpaces = false): string {
+  let out = basename.replace(/[\\/:*?"<>|]/g, '_');
+  if (!keepSpaces) out = out.replace(/\s+/g, '-');
+  return out;
+}
+
+// 左侧补零 | Left-pad a number with zeros to the given width
+export function zeroPad(num: number, width: number): string {
+  let s = String(num);
+  while (s.length < width) s = '0' + s;
+  return s;
+}
+
+// 日期格式化（手写子集，避免依赖 moment）| Date formatter (hand-written subset, no moment dependency)
+// 支持 token：YYYY YY MM M DD D HH H mm m ss s | Supported tokens
+export function formatDateToken(token: string, date: Date = new Date()): string {
+  const map: Record<string, string> = {
+    'YYYY': String(date.getFullYear()),
+    'YY':   String(date.getFullYear()).slice(-2),
+    'MM':   zeroPad(date.getMonth() + 1, 2),
+    'M':    String(date.getMonth() + 1),
+    'DD':   zeroPad(date.getDate(), 2),
+    'D':    String(date.getDate()),
+    'HH':   zeroPad(date.getHours(), 2),
+    'H':    String(date.getHours()),
+    'mm':   zeroPad(date.getMinutes(), 2),
+    'm':    String(date.getMinutes()),
+    'ss':   zeroPad(date.getSeconds(), 2),
+    's':    String(date.getSeconds()),
+  };
+  // 长令牌在前，避免 YY 抢占 YYYY、M 抢占 MM
+  // Longer tokens first to prevent YY matching inside YYYY, M inside MM, etc.
+  return token.replace(/YYYY|YY|MM|M|DD|D|HH|H|mm|m|ss|s/g, (m) => map[m] ?? m);
+}
+
+// 将文件名模板解析为最终文件名主干（不含扩展名，可从 settings.ts 导入）
+// Resolve a filename template to a stem (no extension); exported so settings.ts can import it
+export function formatNameTemplate(template: string, noteName: string, index: number, keepSpaces = false): string {
+  let out = template;
+  out = out.replace(/{date:([^}]+)}/g, (_, fmt: string) => formatDateToken(fmt));
+  out = out.replace(/{notename}/g, noteName);
+  // {index:NNN} —— NNN 的位数决定补零宽度，数值决定起始值
+  // {index:NNN} — width = number of digits in NNN, start = numeric value of NNN
+  out = out.replace(/{index:(\d+)}/g, (_, digits: string) => {
+    const width = digits.length;
+    const start = parseInt(digits, 10);
+    return zeroPad(start + index, width);
+  });
+  // 非法文件名字符永远替换；空白仅在 keepSpaces=false 时转短横
+  // Illegal filename chars always replaced; whitespace→dash only unless keepSpaces
+  out = out.replace(/[\\/:*?"<>|]/g, '_');
+  if (!keepSpaces) out = out.replace(/\s+/g, '-');
+  return out;
 }
 
 /**
@@ -242,7 +300,7 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
   }
 
   resolveAttachmentFolder(file: TFile): string {
-    const { attachmentPathMode, customAttachmentFolder } = this.settings;
+    const { attachmentPathMode, customAttachmentFolder, customTemplateFolder } = this.settings;
     const fileDir = file.parent?.path ?? '';
 
     switch (attachmentPathMode) {
@@ -260,12 +318,48 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
         return normalizePath(`${fileDir}/${subFolder}`);
       }
       case 'samename': {
-        const safeName = sanitizeFolderName(file.basename);
+        const safeName = sanitizeFolderName(file.basename, this.settings.keepOriginalNoteName);
         return normalizePath(`${fileDir}/${safeName}`);
+      }
+      case 'customTemplate': {
+        // 路径模板从 vault 根目录解析，支持 {date:FORMAT} 和 {notename} 占位符
+        // Path template resolved from vault root, supports {date:FORMAT} and {notename} tokens
+        return this.formatPathTemplate(customTemplateFolder || 'assets/{date:YYYY-MM}', file);
       }
       default:
         return normalizePath('attachments');
     }
+  }
+
+  // 将路径模板解析为 vault 根目录下的绝对路径
+  // Resolve a path template into an absolute path from the vault root
+  formatPathTemplate(template: string, file: TFile): string {
+    const keepSpaces = this.settings.keepOriginalNoteName;
+    const noteName  = sanitizeNoteName(file.basename, keepSpaces);
+    // {notepath} 展开为笔记所在文件夹路径（vault 相对路径，已含 /）
+    // {notepath} expands to the note's parent folder path (vault-relative, includes /)
+    const notePath  = file.parent?.path ?? '';
+    // 统一分隔符为 /，按段处理，逐段做占位符替换与清理，再重新拼接
+    // Normalize separators to /, process per-segment, then rejoin
+    // {notepath} 可能包含多段（如 Clippings/2026），先整体替换再按 / 拆段
+    // {notepath} may contain multiple segments; replace it first, then split on /
+    const withNotePath = template.replace(/\\/g, '/').replace(/{notepath}/g, notePath);
+    const segments = withNotePath.split('/');
+    const resolved = segments
+      .map(seg => {
+        let out = seg;
+        out = out.replace(/{date:([^}]+)}/g, (_, fmt: string) => formatDateToken(fmt));
+        out = out.replace(/{notename}/g, noteName);
+        return sanitizeFolderName(out, keepSpaces);
+      })
+      .filter(seg => seg.length > 0);
+    return normalizePath(resolved.join('/'));
+  }
+
+  // 将文件名模板解析为最终文件名主干（不含扩展名）
+  // Resolve a filename template into the final name stem (without extension)
+  formatNameTemplate(template: string, noteName: string, index: number): string {
+    return formatNameTemplate(template, noteName, index, this.settings.keepOriginalNoteName);
   }
 
   async downloadImagesInFile(file: TFile): Promise<void> {
@@ -306,13 +400,11 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
       const attachmentFolder = this.resolveAttachmentFolder(file);
       await this.ensureFolder(attachmentFolder);
 
-      const titleBase = file.basename
-        .replace(/\s+/g, '-')
-        .replace(/[\\/:*?"<>|]/g, '_');
+      const noteName = sanitizeNoteName(file.basename, this.settings.keepOriginalNoteName);
 
       const urlToLocal = new Map<string, { destPath: string; tfile: TFile | null }>();
       const failedUrls: string[]  = [];
-      let savedCount = 1;
+      let savedIndex = 0;
 
       const downloadResults = await runWithConcurrency(
         uniqueUrls.map(url => async () => {
@@ -330,9 +422,8 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           continue;
         }
 
-        const rawName = `${titleBase}-${savedCount}${ext}`
-          .replace(/\s+/g, '-')
-          .replace(/[\\/:*?"<>|]/g, '_');
+        const stem = this.formatNameTemplate(this.settings.imageNameTemplate, noteName, savedIndex);
+        const rawName = `${stem}${ext}`;
         const destPath = await this.resolveDestPath(attachmentFolder, rawName);
 
         try {
@@ -340,14 +431,14 @@ export default class AutoDownloadAttachmentsPlugin extends Plugin {
           // High-level API: returns TFile and registers it in the file abstraction layer immediately for fileToLinktext
           const tf = await this.app.vault.createBinary(destPath, buffer);
           urlToLocal.set(url, { destPath, tfile: tf });
-          savedCount++;
+          savedIndex++;
         } catch {
           // TOCTOU 兜底：resolveDestPath 探测后极短窗口内被占用导致 createBinary 抛错，回退可覆盖写入
           // TOCTOU fallback: createBinary throws if the path is taken in the tiny window after resolveDestPath; fall back to overwrite-capable write
           try {
             await this.app.vault.adapter.writeBinary(destPath, buffer);
             urlToLocal.set(url, { destPath, tfile: null });
-            savedCount++;
+            savedIndex++;
           } catch (err2) {
             this.failedUrls.add(url);
             failedUrls.push(url);

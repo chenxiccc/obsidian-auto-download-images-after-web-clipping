@@ -17,14 +17,26 @@ export interface TranslationMap {
   delaySettingName:        string;
   delaySettingDesc:        string;
 
-  pathModeSettingName:     string;
-  pathModeSettingDesc:     string;
-  pathModeObsidian:        string;
-  pathModeCustom:          string;
-  pathModeSameName:        string;
-  customFolderSettingName: string;
-  customFolderSettingDesc: string;
-  customFolderPlaceholder: string;
+  pathModeSettingName:           string;
+  pathModeSettingDesc:           string;
+  pathModeObsidian:              string;
+  pathModeCustom:                string;
+  pathModeSameName:              string;
+  pathModeCustomTemplate:        string;
+  customFolderSettingName:       string;
+  customFolderSettingDesc:       string;
+  customFolderPlaceholder:       string;
+  customTemplateFolderSettingName:  string;
+  customTemplateFolderSettingDesc:  string;
+  customTemplateFolderPlaceholder:  string;
+  imageNameTemplateSettingName:    string;
+  imageNameTemplateSettingDesc:    string;
+  imageNameTemplatePlaceholder:    string;
+  keepOriginalNameSettingName:     string;
+  keepOriginalNameSettingDesc:     string;
+  previewLabel:                    (preview: string) => string;
+  previewNoteName:                 string;
+  previewNotePath:                 string;
 
   noticeSuccess:           (count: number, name: string) => string;
   noticePartial:           (ok: number, fail: number, name: string) => string;
@@ -63,14 +75,26 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     delaySettingName:           'Debounce delay (ms)',
     delaySettingDesc:           'Processing starts this long after the last file modification. Increase if images are missed because the clipper is still writing.',
 
-    pathModeSettingName:        'Image save location',
-    pathModeSettingDesc:        'Where to save downloaded images.',
-    pathModeObsidian:           'Follow Obsidian settings',
-    pathModeCustom:             'Custom subfolder under the same directory as the note',
-    pathModeSameName:           'Subfolder with the same name as the note (under the same directory)',
-    customFolderSettingName:    'Subfolder name',
-    customFolderSettingDesc:    'Folder name relative to the note\'s directory. Default: attachments',
-    customFolderPlaceholder:    'attachments',
+    pathModeSettingName:              'Image save location',
+    pathModeSettingDesc:              'Where to save downloaded images.',
+    pathModeObsidian:                 'Follow Obsidian settings',
+    pathModeCustom:                   'Custom subfolder under the same directory as the note',
+    pathModeSameName:                 'Subfolder with the same name as the note (under the same directory)',
+    pathModeCustomTemplate:           'Custom path template',
+    customFolderSettingName:          'Subfolder name',
+    customFolderSettingDesc:          'Folder name relative to the note\'s directory. Default: attachments',
+    customFolderPlaceholder:          'attachments',
+    customTemplateFolderSettingName:  'Path template',
+    customTemplateFolderSettingDesc:  'Where to save images, starting from the vault root. Use {notename} for the note name, {notepath} for the note\'s folder, {date:FORMAT} for the date (e.g. {date:YYYY-MM} becomes 2026-08). Extension is added automatically.',
+    customTemplateFolderPlaceholder:  'assets/{date:YYYY-MM}/{notename}',
+    imageNameTemplateSettingName:     'Image filename template',
+    imageNameTemplateSettingDesc:     'Use {notename} for the note name, {index:NNN} for a numeric suffix (e.g. {index:01} gives a two-digit counter starting from 01), {date:FORMAT} for the date. Extension is added automatically.',
+    imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    keepOriginalNameSettingName:      'Keep original note name',
+    keepOriginalNameSettingDesc:      'When on, spaces in the note name are preserved instead of being converted to dashes. Characters illegal on the filesystem (\\ / : * ? " < > |) are always replaced.',
+    previewLabel:                     (preview) => `→ ${preview}`,
+    previewNoteName:                  'Note name',
+    previewNotePath:                  'note/folder',
 
     noticeSuccess:              (count, name) => `✅ Downloaded ${count} image(s) — ${name}`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}: ${ok} succeeded, ${fail} failed (original links kept)`,
@@ -110,14 +134,26 @@ export const TRANSLATIONS: Record<string, TranslationMap> = {
     delaySettingName:           '防抖延迟（毫秒）',
     delaySettingDesc:           '文件最后一次修改后等待此时长再开始处理。如果图片经常漏下，说明剪藏器写入较慢，可适当调大。',
 
-    pathModeSettingName:        '图片保存位置',
-    pathModeSettingDesc:        '下载的图片保存到哪里。',
-    pathModeObsidian:           '跟随 Obsidian 设置',
-    pathModeCustom:             '笔记所在目录下的指定子文件夹',
-    pathModeSameName:           '笔记所在目录下与笔记同名的子文件夹',
-    customFolderSettingName:    '子文件夹名称',
-    customFolderSettingDesc:    '相对于笔记所在目录的子文件夹名称，默认为 attachments',
-    customFolderPlaceholder:    'attachments',
+    pathModeSettingName:              '图片保存位置',
+    pathModeSettingDesc:              '下载的图片保存到哪里。',
+    pathModeObsidian:                 '跟随 Obsidian 设置',
+    pathModeCustom:                   '笔记所在目录下的指定子文件夹',
+    pathModeSameName:                 '笔记所在目录下与笔记同名的子文件夹',
+    pathModeCustomTemplate:           '自定义路径模板',
+    customFolderSettingName:          '子文件夹名称',
+    customFolderSettingDesc:          '相对于笔记所在目录的子文件夹名称，默认为 attachments',
+    customFolderPlaceholder:          'attachments',
+    customTemplateFolderSettingName:  '路径模板',
+    customTemplateFolderSettingDesc:  '图片保存的位置，从库的根目录开始。可用 {notename} 代表笔记名，{notepath} 代表笔记所在文件夹，{date:日期格式} 代表日期（如 {date:YYYY-MM} 会转为如 2026-08 的年月形式）。',
+    customTemplateFolderPlaceholder:  'assets/{date:YYYY-MM}/{notename}',
+    imageNameTemplateSettingName:     '图片文件名模板',
+    imageNameTemplateSettingDesc:     '图片文件名模板。可用 {notename} 代表笔记名，{index:NNN} 数字后缀（如 {index:01} 代表从 01 开始的两位数字序号），同样可以使用 {date:日期格式}。不需要填写后缀名。',
+    imageNameTemplatePlaceholder:     '{notename}-img-p{index:001}',
+    keepOriginalNameSettingName:      '保持原始笔记名',
+    keepOriginalNameSettingDesc:      '开启后，笔记名中的空格将被保留，不再转为短横。文件系统非法字符（\\ / : * ? " < > |）始终会被替换。',
+    previewLabel:                     (preview) => `→ ${preview}`,
+    previewNoteName:                  '笔记名',
+    previewNotePath:                  '笔记文件夹',
 
     noticeSuccess:              (count, name) => `✅ 图片下载完成：${count} 张（${name}）`,
     noticePartial:              (ok, fail, name) => `⚠️ ${name}：${ok} 张成功，${fail} 张失败（已保留原始链接）`,
@@ -148,7 +184,7 @@ export function detectObsidianLang(): string {
 
 // ─── 设置接口 / Settings interface ────────────────────────────────────────
 
-export type AttachmentPathMode = 'obsidian' | 'custom' | 'samename';
+export type AttachmentPathMode = 'obsidian' | 'custom' | 'samename' | 'customTemplate';
 export type Language = 'auto' | 'en' | 'zh';
 
 export interface AutoDownloadSettings {
@@ -157,6 +193,9 @@ export interface AutoDownloadSettings {
   language:               Language;
   attachmentPathMode:     AttachmentPathMode;
   customAttachmentFolder: string;
+  customTemplateFolder:   string;
+  imageNameTemplate:      string;
+  keepOriginalNoteName:   boolean;
 }
 
 export const DEFAULT_SETTINGS: AutoDownloadSettings = {
@@ -165,12 +204,16 @@ export const DEFAULT_SETTINGS: AutoDownloadSettings = {
   language:               'auto',
   attachmentPathMode:     'obsidian',
   customAttachmentFolder: 'attachments',
+  customTemplateFolder:   '_global/assets/{date:YYYY-MM}',
+  imageNameTemplate:      '{notename}-img-p{index:001}',
+  keepOriginalNoteName:   false,
 };
 
 // ─── 设置页 / Settings tab ─────────────────────────────────────────────────
 
 import { App, PluginSettingTab, Setting, getLanguage } from 'obsidian';
 import type AutoDownloadAttachmentsPlugin from './main';
+import { formatDateToken, formatNameTemplate } from './main';
 
 export class AutoDownloadSettingTab extends PluginSettingTab {
   plugin: AutoDownloadAttachmentsPlugin;
@@ -184,6 +227,55 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
     const { language } = this.plugin.settings;
     const lang = language === 'auto' ? detectObsidianLang() : language;
     return TRANSLATIONS[lang] ?? TRANSLATIONS['en']!;
+  }
+
+  // 将模板渲染为预览字符串（{notename}/{notepath} 替换为占位词，其他 token 正常展开）
+  // Render a template to a preview string ({notename}/{notepath} → placeholder words, other tokens expanded normally)
+  private buildPreview(template: string, t: TranslationMap, mode: 'filename' | 'path'): string {
+    const keepSpaces = this.plugin.settings.keepOriginalNoteName;
+    const namePH   = t.previewNoteName;
+    const pathPH   = t.previewNotePath;
+    // 用哨兵字符替换两个 notename/notepath 占位符，展开其余 token 后再换回
+    // Use sentinel chars to replace notename/notepath, expand other tokens, then restore
+    const sentinel = (tpl: string) =>
+      tpl.replace(/{notepath}/g, '\x01').replace(/{notename}/g, '\x00');
+    const restore  = (s: string) =>
+      s.replace(/\x01/g, pathPH).replace(/\x00/g, namePH);
+
+    if (mode === 'path') {
+      // 路径模式：按段展开，保留 /
+      // Path mode: expand per-segment, preserve /
+      const segments = template.replace(/\\/g, '/').split('/').filter(s => s.length > 0);
+      const expanded = segments.map(seg => restore(formatNameTemplate(sentinel(seg), '\x00', 0, keepSpaces)));
+      return expanded.join('/');
+    }
+    // 文件名模式：整体展开
+    // Filename mode: expand as a whole
+    return restore(formatNameTemplate(sentinel(template), '\x00', 0, keepSpaces)) + '.webp';
+  }
+
+  // 将预览行插入到 .setting-item-description 之后（或直接更新已有节点）
+  // Insert (or update) the preview line right after .setting-item-description
+  private attachPreview(settingEl: HTMLElement, text: string): HTMLElement {
+    let el = settingEl.querySelector<HTMLElement>('.auto-dl-live-preview');
+    if (!el) {
+      el = activeDocument.createElement('div');
+      el.className = 'auto-dl-live-preview';
+      el.style.fontFamily = 'var(--font-monospace)';
+      el.style.color = 'var(--text-accent)';
+      el.style.fontSize = 'var(--font-smallest)';
+      el.style.marginTop = '4px';
+      // 插到 .setting-item-description 之后，没有则追加到 settingEl 末尾
+      // Insert after .setting-item-description; fall back to appending to settingEl
+      const desc = settingEl.querySelector('.setting-item-description');
+      if (desc?.parentNode) {
+        desc.parentNode.insertBefore(el, desc.nextSibling);
+      } else {
+        settingEl.appendChild(el);
+      }
+    }
+    el.textContent = text;
+    return el;
   }
 
   display(): void {
@@ -223,6 +315,8 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           });
         text.inputEl.rows = 6;
         text.inputEl.addClass('auto-dl-folder-input');
+        const ctrl = text.inputEl.parentElement;
+        if (ctrl) ctrl.style.flex = '0 0 auto';
       });
 
     // ── 触发延迟 / Debounce delay ─────────────────────────────────────────
@@ -250,9 +344,10 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
       .setDesc(t.pathModeSettingDesc)
       .addDropdown(drop => {
         drop
-          .addOption('obsidian', t.pathModeObsidian)
-          .addOption('custom',   t.pathModeCustom)
-          .addOption('samename', t.pathModeSameName)
+          .addOption('obsidian',        t.pathModeObsidian)
+          .addOption('custom',          t.pathModeCustom)
+          .addOption('samename',        t.pathModeSameName)
+          .addOption('customTemplate',  t.pathModeCustomTemplate)
           .setValue(this.plugin.settings.attachmentPathMode)
           .onChange(async (value) => {
             this.plugin.settings.attachmentPathMode = value as AttachmentPathMode;
@@ -277,5 +372,71 @@ export class AutoDownloadSettingTab extends PluginSettingTab {
           text.inputEl.addClass('auto-dl-custom-folder-input');
         });
     }
+
+    // ── 路径模板（仅 customTemplate 模式显示）/ Path template ──────────────
+    if (this.plugin.settings.attachmentPathMode === 'customTemplate') {
+      const pathTemplateSetting = new Setting(containerEl)
+        .setName(t.customTemplateFolderSettingName)
+        .setDesc(t.customTemplateFolderSettingDesc)
+        .addText(text => {
+          text
+            .setPlaceholder(t.customTemplateFolderPlaceholder)
+            .setValue(this.plugin.settings.customTemplateFolder)
+            .onChange(async (value) => {
+              this.plugin.settings.customTemplateFolder = value.trim() || 'assets/{date:YYYY-MM}';
+              await this.plugin.saveSettings();
+              this.attachPreview(
+                pathTemplateSetting.settingEl,
+                t.previewLabel(this.buildPreview(this.plugin.settings.customTemplateFolder, t, 'path'))
+              );
+            });
+          text.inputEl.addClass('auto-dl-template-folder-input');
+        });
+      // 初始预览 | Initial preview
+      this.attachPreview(
+        pathTemplateSetting.settingEl,
+        t.previewLabel(this.buildPreview(this.plugin.settings.customTemplateFolder, t, 'path'))
+      );
+    }
+
+    // ── 图片文件名模板 / Image filename template ──────────────────────────
+    const nameSetting = new Setting(containerEl)
+      .setName(t.imageNameTemplateSettingName)
+      .setDesc(t.imageNameTemplateSettingDesc)
+      .addText(text => {
+        text
+          .setPlaceholder(t.imageNameTemplatePlaceholder)
+          .setValue(this.plugin.settings.imageNameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.imageNameTemplate = value.trim() || '{notename}-{index:001}';
+            await this.plugin.saveSettings();
+            this.attachPreview(
+              nameSetting.settingEl,
+              t.previewLabel(this.buildPreview(this.plugin.settings.imageNameTemplate, t, 'filename'))
+            );
+          });
+        text.inputEl.addClass('auto-dl-image-name-input');
+      });
+    // 初始预览 | Initial preview
+    this.attachPreview(
+      nameSetting.settingEl,
+      t.previewLabel(this.buildPreview(this.plugin.settings.imageNameTemplate, t, 'filename'))
+    );
+
+    // ── 保持原始笔记名 / Keep original note name ─────────────────────────
+    new Setting(containerEl)
+      .setName(t.keepOriginalNameSettingName)
+      .setDesc(t.keepOriginalNameSettingDesc)
+      .addToggle(toggle => {
+        toggle
+          .setValue(this.plugin.settings.keepOriginalNoteName)
+          .onChange(async (value) => {
+            this.plugin.settings.keepOriginalNoteName = value;
+            await this.plugin.saveSettings();
+            // 开关变化影响预览，整页刷新以同步所有预览
+            // The toggle affects previews; refresh the whole page to sync them
+            this.display();
+          });
+      });
   }
 }
