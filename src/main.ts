@@ -104,9 +104,9 @@ interface ExternalImageScanResult {
 // 根据是否使用 markdown 链接，生成最终的图片引用字符串（语法遵循 Obsidian「文件与链接 → 使用 Wiki 格式」；路径文本由 resolveLinkText 解析，已跟随「内部链接类型」）
 // Generate image reference string. Syntax follows Obsidian "Files & Links → Use Wiki Links"; link-text is resolved by resolveLinkText and already follows "New link format"
 function formatImageLink(linkText: string, alt: string, useMarkdownLinks: boolean): string {
-  return useMarkdownLinks
-    ? `![${alt}](<${linkText}>)`
-    : `![[${linkText}]]`;
+  if (useMarkdownLinks) return `![${alt}](<${linkText}>)`;
+  const display = alt.replace(/^\|/, '').trim();
+  return display ? `![[${linkText}|${display}]]` : `![[${linkText}]]`;
 }
 
 // 为带链接的图片生成最终引用格式：[![alt](img)](link) 的替换
@@ -114,9 +114,9 @@ function formatImageLink(linkText: string, alt: string, useMarkdownLinks: boolea
 // Generate final reference for linked images: replacement for [![alt](img)](link)
 // In wikilink mode, discard outer link (wikilink can't be nested in markdown links); preserve in markdown mode
 function formatLinkedImageLink(linkText: string, alt: string, linkUrl: string, useMarkdownLinks: boolean): string {
-  return useMarkdownLinks
-    ? `[![${alt}](<${linkText}>)](${linkUrl})`
-    : `![[${linkText}]]`;
+  if (useMarkdownLinks) return `[![${alt}](<${linkText}>)](${linkUrl})`;
+  const display = alt.replace(/^\|/, '').trim();
+  return display ? `![[${linkText}|${display}]]` : `![[${linkText}]]`;
 }
 
 function sleep(ms: number): Promise<void> {
